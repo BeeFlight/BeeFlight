@@ -16,7 +16,8 @@ See [DJI_RC3_Indoor_Layout.md](./DJI_RC3_Indoor_Layout.md) for the full diagram.
 | Start/Stop | AUX 4 | ARM / Disarm |
 | N/S/M Switch | AUX 1 | N=Angle, S=Horizon, M=Acro+AirMode |
 | Right Switch | AUX 2 | DOWN=Indoor, MID=Outdoor, UP=Turtle |
-| RTH Button | AUX 3 | Beeper (find drone) |
+| C1 Button | AUX 5 | Beeper (find drone) |
+| RTH Button | AUX 3 | Unassigned |
 
 ## 3. Indoor/Outdoor Profile Switching
 The right switch (`adjrange`) automatically selects both PID and rate profiles:
