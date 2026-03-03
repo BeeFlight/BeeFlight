@@ -55,4 +55,5 @@ Includes an integrated `localStorage` mock-data pipeline. Developers can click "
 ### Installation & Usage
 1. Clone this repository to your local machine:
    ```bash
-   git clone [https://github.com/yourusername/betaflight-ai.git](https://github.com/yourusername/betaflight-ai.git)
+   git clone https://github.com/tcdomain/Ai.git
+   ```
