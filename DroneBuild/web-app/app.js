@@ -23,6 +23,7 @@ const droneState = {
     connected: false,
     firmwareIdentifier: "Unknown",
     firmwareVersion: "Unknown",
+    boardName: "Unknown",
     mspApiVersion: "Unknown",
     live: {
         status: { armed: false, cycleTime: 0, cpuLoad: 0 },
@@ -61,7 +62,8 @@ const droneState = {
             dtermLowpassHz: null
         }
     },
-    cliDiff: "" // Raw text from `diff all`
+    cliDiff: "", // Raw text from `diff all`
+    cliDump: ""  // Alias used for history snapshots / restore
 };
 
 // ---- UI Elements ----
@@ -88,6 +90,25 @@ const githubAuthStatus = document.getElementById('githubAuthStatus');
 const btnExportLocal = document.getElementById('btnExportLocal');
 const btnExportDrive = document.getElementById('btnExportDrive');
 const btnExportGist = document.getElementById('btnExportGist');
+// Restore/import elements
+const importFileInput = document.getElementById('importFileInput');
+const btnSelectImportFile = document.getElementById('btnSelectImportFile');
+const restoreStateUpload = document.getElementById('restoreStateUpload');
+const restoreStateAnalyzing = document.getElementById('restoreStateAnalyzing');
+const restoreStateChecklist = document.getElementById('restoreStateChecklist');
+const importErrorBox = document.getElementById('importErrorBox');
+const btnFlashDrone = document.getElementById('btnFlashDrone');
+const btnCancelImport = document.getElementById('btnCancelImport');
+const importProgressContainer = document.getElementById('importProgressContainer');
+const importProgressBar = document.getElementById('importProgressBar');
+const importProgressLabel = document.getElementById('importProgressLabel');
+const chkHardwareIcon = document.getElementById('chkHardwareIcon');
+const chkVersionIcon = document.getElementById('chkVersionIcon');
+const chkIntegrityIcon = document.getElementById('chkIntegrityIcon');
+const chkMotorIcon = document.getElementById('chkMotorIcon');
+
+// Session history for AI actions (time machine)
+window.sessionHistory = window.sessionHistory || [];
 
 // ---- Integration Local Storage Keys ----
 const GOOGLE_CLIENT_ID_KEY = 'bfai_google_client_id';
@@ -95,6 +116,8 @@ const GITHUB_PAT_KEY = 'bfai_github_pat';
 const GITHUB_PUBLIC_DEFAULT_KEY = 'bfai_github_public_default';
 
 let googleDriveAuthed = false;
+let importFileText = '';
+let lastImportValidation = null;
 
 function getGoogleClientId() {
     return localStorage.getItem(GOOGLE_CLIENT_ID_KEY) || '';
@@ -146,6 +169,44 @@ function updateIntegrationStatusUI() {
     if (githubAuthStatus) {
         githubAuthStatus.textContent = hasPat ? 'Ready' : 'Not configured';
     }
+}
+
+function resetImportUI() {
+    if (!restoreStateUpload) return;
+    restoreStateUpload.classList.remove('hidden');
+    if (restoreStateAnalyzing) restoreStateAnalyzing.classList.add('hidden');
+    if (restoreStateChecklist) restoreStateChecklist.classList.add('hidden');
+    if (importErrorBox) {
+        importErrorBox.textContent = '';
+        importErrorBox.classList.add('hidden');
+    }
+    if (btnFlashDrone) btnFlashDrone.disabled = true;
+    if (importProgressContainer) importProgressContainer.classList.add('hidden');
+    if (importProgressBar) importProgressBar.style.width = '0%';
+    if (importProgressLabel) importProgressLabel.textContent = '0%';
+    if (importFileInput) importFileInput.value = '';
+    importFileText = '';
+    lastImportValidation = null;
+    const icons = [chkHardwareIcon, chkVersionIcon, chkIntegrityIcon, chkMotorIcon];
+    icons.forEach(icon => {
+        if (!icon) return;
+        icon.textContent = '⬜';
+        icon.classList.remove('pass', 'fail');
+    });
+}
+
+function setImportAnalyzingState() {
+    if (!restoreStateUpload) return;
+    restoreStateUpload.classList.add('hidden');
+    if (restoreStateAnalyzing) restoreStateAnalyzing.classList.remove('hidden');
+    if (restoreStateChecklist) restoreStateChecklist.classList.add('hidden');
+    if (importErrorBox) importErrorBox.classList.add('hidden');
+    if (btnFlashDrone) btnFlashDrone.disabled = true;
+}
+
+function updateImportProgress(pct) {
+    if (importProgressBar) importProgressBar.style.width = `${pct}%`;
+    if (importProgressLabel) importProgressLabel.textContent = `${pct}%`;
 }
 
 // ---- Serial State ----
@@ -376,6 +437,166 @@ function appendChatMessage(role, text) {
     chatContainer.scrollTop = chatContainer.scrollHeight;
 }
 
+function renderAiResponse(rawText) {
+    // Look for ```action ... ``` fenced block
+    const actionFence = '```action';
+    const fenceIndex = rawText.indexOf(actionFence);
+    if (fenceIndex === -1) {
+        appendChatMessage('ai', rawText);
+        return;
+    }
+
+    const before = rawText.slice(0, fenceIndex).trim();
+    const afterStart = fenceIndex + actionFence.length;
+    const closingIndex = rawText.indexOf('```', afterStart);
+    if (closingIndex === -1) {
+        // malformed; just show as normal text
+        appendChatMessage('ai', rawText);
+        return;
+    }
+
+    const jsonText = rawText.slice(afterStart, closingIndex).trim();
+    let action = null;
+    try {
+        action = JSON.parse(jsonText);
+    } catch (e) {
+        log.error('Failed to parse action JSON', jsonText);
+        appendChatMessage('ai', rawText);
+        return;
+    }
+
+    // Optional explanatory text before the action
+    if (before) {
+        appendChatMessage('ai', before);
+    }
+
+    // Render action card
+    const container = document.createElement('div');
+    container.classList.add('message', 'ai-message');
+
+    const card = document.createElement('div');
+    card.classList.add('action-card');
+
+    const title = document.createElement('div');
+    title.classList.add('action-title');
+    title.textContent = action.intent || 'Proposed Change';
+
+    const summary = document.createElement('div');
+    summary.classList.add('action-summary');
+    summary.textContent = action.summary || '';
+
+    const details = document.createElement('details');
+    const summaryTag = document.createElement('summary');
+    summaryTag.textContent = 'Show CLI';
+    details.appendChild(summaryTag);
+    const codeBlock = document.createElement('pre');
+    codeBlock.classList.add('action-cli');
+    const cmds = Array.isArray(action.commands) ? action.commands : [];
+    codeBlock.textContent = cmds.join('\n');
+    details.appendChild(codeBlock);
+
+    const actionsRow = document.createElement('div');
+    actionsRow.classList.add('action-buttons');
+
+    const approveBtn = document.createElement('button');
+    approveBtn.classList.add('btn-primary', 'action-approve');
+    approveBtn.textContent = 'Approve & Flash';
+
+    const spinner = document.createElement('div');
+    spinner.classList.add('action-spinner', 'hidden');
+
+    const statusText = document.createElement('div');
+    statusText.classList.add('action-status');
+
+    const undoBtn = document.createElement('button');
+    undoBtn.classList.add('btn-secondary', 'action-undo', 'hidden');
+    undoBtn.textContent = '↩️ Undo (Rollback)';
+
+    actionsRow.appendChild(approveBtn);
+    actionsRow.appendChild(spinner);
+    actionsRow.appendChild(undoBtn);
+
+    card.appendChild(title);
+    card.appendChild(summary);
+    card.appendChild(details);
+    card.appendChild(actionsRow);
+    card.appendChild(statusText);
+
+    container.appendChild(card);
+    chatContainer.appendChild(container);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+
+    // Execution wiring
+    const commands = cmds.map(c => String(c || '').trim()).filter(c => c.length > 0);
+
+    approveBtn.addEventListener('click', async () => {
+        if (commands.length === 0) {
+            statusText.textContent = 'No CLI commands found in action.';
+            return;
+        }
+
+        // Security validation
+        const banned = ['resource', 'defaults', 'timer', 'dma', 'flash'];
+        const allowedPrefixes = ['set', 'profile', 'rateprofile', 'save'];
+        for (const cmd of commands) {
+            const lower = cmd.toLowerCase();
+            if (banned.some(b => lower.includes(b))) {
+                statusText.textContent = 'Action rejected: contains unsafe or unsupported CLI commands.';
+                return;
+            }
+            const firstWord = lower.split(/\s+/)[0];
+            if (!allowedPrefixes.includes(firstWord)) {
+                statusText.textContent = 'Action rejected: only set/profile/rateprofile/save commands are allowed.';
+                return;
+            }
+        }
+
+        // Snapshot
+        const uniqueID = `act-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        card.dataset.executionId = uniqueID;
+        if (!window.sessionHistory) window.sessionHistory = [];
+        window.sessionHistory.push({
+            id: uniqueID,
+            timestamp: Date.now(),
+            previousDump: droneState.cliDump || droneState.cliDiff || ''
+        });
+
+        approveBtn.disabled = true;
+        spinner.classList.remove('hidden');
+        statusText.textContent = 'Flashing changes...';
+
+        await restoreCliData(commands.join('\n'));
+
+        spinner.classList.add('hidden');
+        statusText.textContent = '✅ Applied Successfully';
+        approveBtn.classList.add('hidden');
+        undoBtn.classList.remove('hidden');
+    });
+
+    undoBtn.addEventListener('click', async () => {
+        const id = card.dataset.executionId;
+        if (!id || !window.sessionHistory) {
+            statusText.textContent = 'No rollback information available.';
+            return;
+        }
+        const record = window.sessionHistory.find(r => r.id === id);
+        if (!record || !record.previousDump) {
+            statusText.textContent = 'No previous configuration snapshot found for rollback.';
+            return;
+        }
+
+        undoBtn.disabled = true;
+        spinner.classList.remove('hidden');
+        statusText.textContent = 'Rolling back changes...';
+
+        await restoreCliData(record.previousDump);
+
+        spinner.classList.add('hidden');
+        statusText.textContent = '⏪ Rollback Complete';
+        undoBtn.classList.add('hidden');
+    });
+}
+
 function updateAiStatus() {
     const key = getApiKey();
     if (key && key.length > 10) {
@@ -434,18 +655,25 @@ ${droneState.cliDiff || '(Not yet synced — CLI diff has not been captured yet.
 - Reference the live telemetry when discussing the drone's current state (armed, tilt, stick positions).
 - Reference the configuration diff when discussing settings (PIDs, filters, UARTs, VTX, OSD).
 - If the user asks to calibrate their voltage or amperage, use the provided CLI data to find their current scale. The formula for Betaflight voltage calibration is: New Scale = Old Scale * (Drone Reading / Multimeter Reading). Calculate the new scale, and generate the \`set vbat_scale = [NEW_VALUE]\` and \`save\` CLI commands for them.
-- If the user asks for a tuning change, generate the exact CLI commands they need to apply it, formatted in a markdown code block so our UI can parse it later.
 - NEVER generate commands that arm motors without explicit safety warnings.
 - If the CLI diff is not yet available, tell the user you can still help based on live telemetry but recommend they sync context first.
-- BLACKBOX INTENTS: If the user selects 'Filter & Noise Diagnostics', generate CLI commands: \`set debug_mode = GYRO_SCALED\` and \`set blackbox_sample_rate = 1/1\`. If they select 'General Flight & PIDs', generate: \`set debug_mode = NONE\`. If they select 'Disable Logging', generate: \`set blackbox_device = NONE\`. Always remind them to erase their flash memory before a tuning flight.
+- BLACKBOX INTENTS: If the user selects 'Filter & Noise Diagnostics', generate CLI commands as usual but wrap them in an action JSON (see below). If they select 'General Flight & PIDs', generate the appropriate CLI commands in an action JSON. If they select 'Disable Logging', generate the appropriate CLI commands in an action JSON. Always remind them to erase their flash memory before a tuning flight.
 - MOTOR DIAGNOSTICS: If a user asks why their drone flips instantly on takeoff, check their yaw_motors_reversed and mixer settings in the CLI dump. Explain that their physical props, physical motor spin direction, and the software yaw_motors_reversed toggle must all match exactly. Tell them to look at the 3D Motors visualizer tab to verify.
-- OSD TEMPLATES: If the user clicks an OSD template button, generate the CLI block to enable the relevant osd_..._pos elements based on their selected video system (Analog 30x16 vs HD 50x18). If they ask you for help aligning items (e.g. 'put my timer right below my voltage'), use their current droneState.cliDiff to find the voltage coordinates, calculate the row directly beneath it, and output the new CLI command with the correct position integer.
+- OSD TEMPLATES: If the user clicks an OSD template button, generate the CLI commands to enable the relevant osd_..._pos elements based on their selected video system (Analog 30x16 vs HD 50x18) as an action JSON (see below).
 - SYMPTOM-BASED TUNING: When the user describes tuning symptoms (e.g. hot motors, propwash on descent, bounce-back, sluggish feel), always base your advice on the parsed droneState.dynamics JSON.
 - HOT MOTORS: For hot motors, always suggest lowering d_pitch and d_roll by about 10–15% from their current values. Also inspect dterm_lowpass_hz; if it is very high (e.g. > 150Hz) recommend reducing it modestly to reduce heat. Never suggest *increasing* any D-term when the symptom is hot motors.
 - PROPWASH SHAKES: For propwash shakes on descent, suggest small increases to d_pitch and d_roll (within safe limits) and/or reducing filter delay (for example, modestly raising gyro_lowpass_hz or dterm_lowpass_hz within reasonable ranges), while still respecting the D-term safety rule below.
-- CINEMATIC RATES: For cinematic feel, generate CLI commands to lower rc_rate (especially on roll and pitch) and increase rc_expo so the center stick is softer but full-stick authority is preserved. Explain the tradeoff in words and then output the CLI block.
+- CINEMATIC RATES: For cinematic feel, propose changes to rc_rate and rc_expo so the center stick is softer but full-stick authority is preserved, and output these as CLI commands inside an action JSON (see below), not as raw CLI text.
 - SAFETY D-TERM LIMIT: Never increase any D-term value (d_roll, d_pitch, d_yaw) by more than 5 absolute points at a time. If the user's current D-term is already very high (e.g. above 50), recommend reductions instead of increases.
-- CLI OUTPUT FORMAT: For all tuning suggestions, always output the exact \`set [variable] = [value]\` and a \`save\` command inside a markdown code block, so the user can paste them directly into the Betaflight CLI.`;
+
+## ACTION FORMAT
+When the user asks you to change a configuration setting (PIDs, rates, filters, VTX, Blackbox, OSD, etc.), you MUST respond with a structured JSON block wrapped in a fenced code block annotated as \`\`\`action (no other markdown). The JSON MUST have this shape:
+{
+  "intent": "<short human readable description of the change>",
+  "summary": "<1-2 sentence explanation of what this change will do and why>",
+  "commands": ["set ...", "set ...", "save"]
+}
+Do not include any additional fields. Do not wrap the JSON in markdown besides the single \`\`\`action fence. All CLI commands must be in the commands array only.`;
 
     try {
         const resp = await fetch(
@@ -461,7 +689,8 @@ ${droneState.cliDiff || '(Not yet synced — CLI diff has not been captured yet.
         );
         if (!resp.ok) throw new Error(`API ${resp.status}`);
         const data = await resp.json();
-        appendChatMessage('ai', data.candidates[0].content.parts[0].text);
+        const text = data.candidates[0].content.parts[0].text;
+        renderAiResponse(text);
     } catch (err) {
         log.error('Gemini API call failed', err);
         logToConsole(`Gemini Error: ${err.message}`, 'error');
@@ -514,6 +743,7 @@ function parseMspFrame(cmd, payload) {
         }
         case MSP.MSP_FC_VARIANT: {
             droneState.firmwareIdentifier = MSP.parseFcVariant(payload);
+            droneState.boardName = droneState.firmwareIdentifier;
             logToConsole(`FC Variant: ${droneState.firmwareIdentifier}`, 'success');
             break;
         }
@@ -707,6 +937,7 @@ async function injectAIContext() {
 
         // Store the raw output
         droneState.cliDiff = cliOutput.trim();
+        droneState.cliDump = droneState.cliDiff;
         logToConsole(`CLI diff captured (${droneState.cliDiff.length} chars)`, 'success');
 
         // Exit CLI mode
@@ -877,6 +1108,7 @@ async function captureCliDiff() {
         }
 
         droneState.cliDiff = cliOutput.trim();
+        droneState.cliDump = droneState.cliDiff;
         log.info(`CLI capture finished. Final length: ${droneState.cliDiff.length}`);
         logToConsole(`CLI diff captured (${droneState.cliDiff.length} chars)`, 'success');
 
@@ -913,6 +1145,8 @@ navigator.serial.addEventListener('disconnect', (event) => {
         connectionStatus.textContent = "Disconnected";
         connectionStatus.classList.remove("connected");
         stopPolling();
+        // Clear session history on disconnect to prevent cross-drone rollbacks
+        if (window.sessionHistory) window.sessionHistory = [];
     }
 });
 
@@ -952,6 +1186,9 @@ async function connectToDrone() {
         logToConsole('Connection cancelled.', 'error');
         return;
     }
+
+    // Clear session history for a new connection session
+    if (window.sessionHistory) window.sessionHistory = [];
 
     // ---- PHASE A: Open port, capture CLI diff ----
     try {
@@ -1088,6 +1325,111 @@ if (btnExportGist) {
         const fileName = buildBackupFileName();
         const content = getBackupContent();
         publishToGitHub(fileName, content);
+    });
+}
+
+// ---- Restore/Import Wiring ----
+if (btnSelectImportFile && importFileInput) {
+    btnSelectImportFile.addEventListener('click', () => {
+        importFileInput.click();
+    });
+}
+
+if (importFileInput) {
+    importFileInput.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) {
+            resetImportUI();
+            return;
+        }
+
+        setImportAnalyzingState();
+
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+            const text = String(ev.target?.result || '');
+            importFileText = text;
+
+            const lines = text.split(/\r?\n/);
+            const headerSnippet = lines.slice(0, 60).join('\n');
+            const tailSnippet = lines.slice(-10).join('\n');
+
+            const context = {
+                headerSnippet,
+                tailSnippet,
+                liveBoard: droneState.boardName || droneState.firmwareIdentifier || 'Unknown',
+                liveVersion: droneState.firmwareVersion || 'Unknown',
+                fileApproxLines: lines.length
+            };
+
+            const result = await validateBackupWithAi(context);
+            if (!result) {
+                resetImportUI();
+                return;
+            }
+
+            lastImportValidation = result;
+
+            if (restoreStateAnalyzing) restoreStateAnalyzing.classList.add('hidden');
+            if (restoreStateChecklist) restoreStateChecklist.classList.remove('hidden');
+
+            const mapping = [
+                { key: 'hardwareMatch', icon: chkHardwareIcon },
+                { key: 'versionMatch', icon: chkVersionIcon },
+                { key: 'fileIntegrity', icon: chkIntegrityIcon },
+                { key: 'motorSafety', icon: chkMotorIcon }
+            ];
+            let allPass = true;
+            mapping.forEach(({ key, icon }) => {
+                const pass = !!result[key];
+                if (!pass) allPass = false;
+                if (!icon) return;
+                icon.textContent = pass ? '✅' : '❌';
+                icon.classList.remove('pass', 'fail');
+                icon.classList.add(pass ? 'pass' : 'fail');
+            });
+
+            if (importErrorBox) {
+                if (!allPass) {
+                    importErrorBox.textContent = result.reasoning || 'One or more checks failed. Restore is blocked.';
+                    importErrorBox.classList.remove('hidden');
+                } else {
+                    importErrorBox.textContent = '';
+                    importErrorBox.classList.add('hidden');
+                }
+            }
+
+            if (btnFlashDrone) {
+                btnFlashDrone.disabled = !allPass;
+            }
+
+            if (restoreStateUpload) restoreStateUpload.classList.add('hidden');
+        };
+        reader.onerror = () => {
+            logToConsole('Failed to read backup file.', 'error');
+            showToast('Failed to read backup file.', 'error');
+            resetImportUI();
+        };
+        reader.readAsText(file);
+    });
+}
+
+if (btnCancelImport) {
+    btnCancelImport.addEventListener('click', () => {
+        resetImportUI();
+    });
+}
+
+if (btnFlashDrone) {
+    btnFlashDrone.addEventListener('click', () => {
+        if (!importFileText) {
+            showToast('No backup file loaded.', 'error');
+            return;
+        }
+        btnFlashDrone.disabled = true;
+        if (importProgressContainer) importProgressContainer.classList.remove('hidden');
+        updateImportProgress(0);
+        restoreCliData(importFileText);
     });
 }
 
@@ -1340,6 +1682,124 @@ async function publishToGitHub(fileName, fileContent) {
     } catch (err) {
         log.error('GitHub Gist export failed', err);
         showToast('GitHub Gist export failed. See System Logs.', 'error');
+    }
+}
+
+async function validateBackupWithAi(context) {
+    const apiKey = getApiKey();
+    if (!apiKey) {
+        promptForApiKey();
+        return null;
+    }
+
+    const systemPrompt = `You are a Betaflight Safety Inspector. Compare the uploaded file snippet to the live drone state.
+You MUST return a strict JSON object with these keys:
+- hardwareMatch: boolean (does board_name match the live board?)
+- versionMatch: boolean (does the Betaflight major/minor version match the live firmware?)
+- fileIntegrity: boolean (does this look like a valid Betaflight dump, with headers and a terminating save command?)
+- motorSafety: boolean (is the configured motor protocol a DSHOT variant, indicating safe digital throttle signaling?)
+- reasoning: string (short explanation of any failures or risks).
+
+Rules:
+- Output ONLY raw JSON, no markdown and no extra commentary.
+- If you are uncertain about any key, set it to false and explain why in the reasoning string.`;
+
+    try {
+        const resp = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    systemInstruction: { parts: [{ text: systemPrompt }] },
+                    contents: [{ parts: [{ text: JSON.stringify(context) }] }]
+                })
+            }
+        );
+        if (!resp.ok) throw new Error(`API ${resp.status}`);
+        const data = await resp.json();
+        const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        if (!raw) throw new Error('Empty validation response from AI');
+        try {
+            return JSON.parse(raw);
+        } catch (e) {
+            log.error('Backup validation JSON parse error', raw);
+            throw new Error('AI did not return valid JSON');
+        }
+    } catch (err) {
+        log.error('Backup AI validation failed', err);
+        showToast('Backup validation failed. See System Logs.', 'error');
+        return null;
+    }
+}
+
+async function restoreCliData(fullText) {
+    if (!port) {
+        logToConsole('Cannot restore configuration — not connected to a flight controller.', 'error');
+        showToast('Connect to your drone before restoring a backup.', 'error');
+        return;
+    }
+
+    const lines = fullText.split(/\r?\n/).map(l => l.trim());
+    const payloadLines = lines.filter(l => l.length > 0 && !l.startsWith('#'));
+    if (payloadLines.length === 0) {
+        showToast('Backup file appears to be empty.', 'error');
+        return;
+    }
+
+    logToConsole(`Starting CLI restore (${payloadLines.length} lines)...`, 'info');
+    showToast('Restoring configuration. Do not unplug the drone.', 'info');
+
+    // Pause MSP polling and enter CLI mode
+    stopPolling();
+    cliMode = true;
+    await sleep(300);
+
+    if (writer) {
+        try { writer.releaseLock(); } catch (e) { }
+        writer = null;
+    }
+    if (reader) {
+        try { await reader.cancel(); } catch (e) { }
+        try { reader.releaseLock(); } catch (e) { }
+        reader = null;
+    }
+
+    const encoder = new TextEncoder();
+    let cliWriter = null;
+    try {
+        cliWriter = port.writable.getWriter();
+
+        // Enter CLI
+        await cliWriter.write(encoder.encode('#\n'));
+        await sleep(500);
+
+        const totalSteps = payloadLines.length + 1; // including save
+        let sent = 0;
+
+        for (let i = 0; i < payloadLines.length; i++) {
+            const line = payloadLines[i];
+            await cliWriter.write(encoder.encode(line + '\n'));
+            sent++;
+            const pct = Math.round((sent / totalSteps) * 100);
+            updateImportProgress(pct);
+            await sleep(30);
+        }
+
+        // Final save
+        await cliWriter.write(encoder.encode('save\n'));
+        updateImportProgress(100);
+        logToConsole('Restore complete. FC is rebooting after save.', 'success');
+        showToast('Restore complete. Flight controller is rebooting. Reconnect to refresh state.', 'success');
+    } catch (err) {
+        log.error('CLI restore error', err);
+        logToConsole(`CLI restore error: ${err.message}`, 'error');
+        showToast('Restore failed. See System Logs.', 'error');
+    } finally {
+        try {
+            if (cliWriter) cliWriter.releaseLock();
+        } catch (e) { }
+        cliMode = false;
     }
 }
 

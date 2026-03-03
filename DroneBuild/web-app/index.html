@@ -603,11 +603,12 @@
                             <h2 class="tab-title">Backup &amp; Export</h2>
 
                             <div class="backup-layout">
+                                <!-- Export Card -->
                                 <div class="data-card">
                                     <div class="card-header">Export Current Configuration</div>
                                     <div class="card-body">
                                         <p class="backup-copy">
-                                            Export your current Betaflight configuration diff so you can restore it
+                                            Export your current BeeFlight configuration diff so you can restore it
                                             later or share it safely with others.
                                         </p>
 
@@ -625,13 +626,78 @@
                                                 <span id="driveAuthStatus" class="auth-status-pill">Not connected</span>
                                             </div>
 
-                        <div class="backup-cloud-option">
+                                            <div class="backup-cloud-option">
                                                 <button id="btnExportGist" class="backup-export-btn">
                                                     <span class="backup-icon">🐙</span>
                                                     <span class="backup-label">Publish to GitHub (Gist)</span>
                                                 </button>
                                                 <span id="githubAuthStatus" class="auth-status-pill">Not
                                                     configured</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Restore Card -->
+                                <div class="data-card restore-card">
+                                    <div class="card-header">Restore Configuration</div>
+                                    <div class="card-body">
+                                        <!-- State 1: Upload -->
+                                        <div id="restoreStateUpload">
+                                            <p class="backup-copy">
+                                                Select a previously saved backup file to restore your configuration.
+                                                BeeFlight AI will run a safety checklist before flashing anything.
+                                            </p>
+                                            <input type="file" id="importFileInput" accept=".txt" class="hidden">
+                                            <button id="btnSelectImportFile" class="backup-export-btn">
+                                                <span class="backup-icon">📁</span>
+                                                <span class="backup-label">Select Backup File</span>
+                                            </button>
+                                        </div>
+
+                                        <!-- State 2: Analyzing -->
+                                        <div id="restoreStateAnalyzing" class="hidden restore-analyzing">
+                                            <div class="spinner"></div>
+                                            <p>AI is analyzing your backup file...</p>
+                                        </div>
+
+                                        <!-- State 3 & 4: Checklist + Gate -->
+                                        <div id="restoreStateChecklist" class="hidden">
+                                            <div id="preFlightChecklist" class="checklist">
+                                                <div class="check-item" data-key="hardwareMatch">
+                                                    <span id="chkHardwareIcon" class="check-icon">⬜</span>
+                                                    <span>Hardware Target Match</span>
+                                                </div>
+                                                <div class="check-item" data-key="versionMatch">
+                                                    <span id="chkVersionIcon" class="check-icon">⬜</span>
+                                                    <span>Firmware Version Compatibility</span>
+                                                </div>
+                                                <div class="check-item" data-key="fileIntegrity">
+                                                    <span id="chkIntegrityIcon" class="check-icon">⬜</span>
+                                                    <span>File Integrity (No missing data)</span>
+                                                </div>
+                                                <div class="check-item" data-key="motorSafety">
+                                                    <span id="chkMotorIcon" class="check-icon">⬜</span>
+                                                    <span>Motor Protocol Safety</span>
+                                                </div>
+                                            </div>
+
+                                            <div id="importErrorBox" class="import-error hidden"></div>
+
+                                            <div id="importProgressContainer" class="import-progress hidden">
+                                                <div class="import-progress-bar-outer">
+                                                    <div id="importProgressBar" class="import-progress-bar-inner"></div>
+                                                </div>
+                                                <span id="importProgressLabel" class="import-progress-label">0%</span>
+                                            </div>
+
+                                            <div class="restore-actions">
+                                                <button id="btnFlashDrone" class="btn-danger" disabled>
+                                                    Overwrite Current Settings
+                                                </button>
+                                                <button id="btnCancelImport" class="btn-secondary">
+                                                    Cancel
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
