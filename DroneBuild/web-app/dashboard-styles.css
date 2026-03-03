@@ -862,3 +862,239 @@
     margin: 0;
     font-style: italic;
 }
+
+/* =========================================================
+   BACKUP TAB (Exports)
+   ========================================================= */
+.backup-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.backup-copy {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+}
+
+.backup-export-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.backup-export-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-panel);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.backup-export-btn:hover {
+    border-color: var(--accent);
+    background: rgba(0, 240, 255, 0.05);
+}
+
+.backup-icon {
+    font-size: 1.1rem;
+}
+
+.backup-cloud-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.auth-status-pill {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.9);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-muted);
+}
+
+/* =========================================================
+   PID TUNING & RATES TAB
+   ========================================================= */
+.pid-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.pid-topbar .card-body {
+    display: flex;
+    justify-content: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.pid-profile-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: rgba(15, 118, 110, 0.12);
+    border: 1px solid rgba(45, 212, 191, 0.3);
+}
+
+.pid-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+}
+
+.pid-value {
+    font-family: 'Courier New', monospace;
+    font-weight: 700;
+    color: var(--accent);
+}
+
+.pid-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 1.1fr;
+    gap: 16px;
+}
+
+.pid-column-left,
+.pid-column-right {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.pid-rates-table {
+    margin-top: 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border-subtle);
+    overflow: hidden;
+    font-size: 0.85rem;
+}
+
+.pid-rates-header,
+.pid-rates-row {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 1fr 1fr;
+    padding: 6px 10px;
+}
+
+.pid-rates-header {
+    background: rgba(15, 23, 42, 0.8);
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.pid-rates-row:nth-child(odd) {
+    background: rgba(15, 23, 42, 0.4);
+}
+
+.pid-rates-row:nth-child(even) {
+    background: rgba(15, 23, 42, 0.2);
+}
+
+.pid-rates-row span {
+    font-family: 'Courier New', monospace;
+}
+
+.pid-templates {
+    margin-top: 12px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.pid-template-btn {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.pid-template-btn:hover {
+    border-color: var(--accent);
+    background: rgba(0, 240, 255, 0.05);
+}
+
+.pid-table-wrapper {
+    overflow-x: auto;
+}
+
+.pid-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.pid-table th,
+.pid-table td {
+    padding: 8px 10px;
+    text-align: center;
+}
+
+.pid-table th {
+    color: var(--accent-blue);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.pid-table tbody tr:nth-child(odd) {
+    background: rgba(15, 23, 42, 0.4);
+}
+
+.pid-table tbody tr:nth-child(even) {
+    background: rgba(15, 23, 42, 0.2);
+}
+
+.pid-diagnostic-card .card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.pid-diagnostic-copy {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin: 0;
+}
+
+.symptom-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.symptom-badge {
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.6);
+    background: rgba(15, 23, 42, 0.8);
+    color: var(--text-primary);
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.symptom-badge:hover {
+    border-color: var(--accent);
+    background: rgba(0, 240, 255, 0.08);
+}

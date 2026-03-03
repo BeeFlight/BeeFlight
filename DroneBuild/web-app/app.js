@@ -76,6 +76,77 @@ const thinkingIndicator = document.getElementById('thinkingIndicator');
 const connectSection = document.getElementById('connectSection');
 const dashboardLayout = document.getElementById('dashboardLayout');
 const syncOverlay = document.getElementById('syncOverlay');
+// ---- Integration Settings ----
+const googleClientIdInput = document.getElementById('googleClientIdInput');
+const saveGoogleClientIdBtn = document.getElementById('saveGoogleClientIdBtn');
+const googleStatusLabel = document.getElementById('googleStatusLabel');
+const githubPatInput = document.getElementById('githubPatInput');
+const githubPublicDefaultToggle = document.getElementById('githubPublicDefaultToggle');
+const saveGithubPatBtn = document.getElementById('saveGithubPatBtn');
+const driveAuthStatus = document.getElementById('driveAuthStatus');
+const githubAuthStatus = document.getElementById('githubAuthStatus');
+const btnExportLocal = document.getElementById('btnExportLocal');
+const btnExportDrive = document.getElementById('btnExportDrive');
+const btnExportGist = document.getElementById('btnExportGist');
+
+// ---- Integration Local Storage Keys ----
+const GOOGLE_CLIENT_ID_KEY = 'bfai_google_client_id';
+const GITHUB_PAT_KEY = 'bfai_github_pat';
+const GITHUB_PUBLIC_DEFAULT_KEY = 'bfai_github_public_default';
+
+let googleDriveAuthed = false;
+
+function getGoogleClientId() {
+    return localStorage.getItem(GOOGLE_CLIENT_ID_KEY) || '';
+}
+
+function setGoogleClientId(id) {
+    localStorage.setItem(GOOGLE_CLIENT_ID_KEY, id || '');
+}
+
+function getGithubPat() {
+    return localStorage.getItem(GITHUB_PAT_KEY) || '';
+}
+
+function setGithubPat(pat) {
+    localStorage.setItem(GITHUB_PAT_KEY, pat || '');
+}
+
+function getGithubPublicDefault() {
+    return localStorage.getItem(GITHUB_PUBLIC_DEFAULT_KEY) === 'true';
+}
+
+function setGithubPublicDefault(val) {
+    localStorage.setItem(GITHUB_PUBLIC_DEFAULT_KEY, val ? 'true' : 'false');
+}
+
+function updateIntegrationStatusUI() {
+    const hasClientId = !!getGoogleClientId();
+    if (googleStatusLabel) {
+        googleStatusLabel.textContent = googleDriveAuthed
+            ? 'Connected to Google Drive'
+            : hasClientId
+                ? 'Client ID saved — connect on export'
+                : 'Not connected';
+    }
+    if (driveAuthStatus) {
+        driveAuthStatus.textContent = googleDriveAuthed
+            ? 'Ready'
+            : hasClientId
+                ? 'Auth required'
+                : 'Not connected';
+    }
+
+    const hasPat = !!getGithubPat();
+    if (githubStatusLabel) {
+        githubStatusLabel.textContent = hasPat
+            ? 'Token saved — ready to publish'
+            : 'Not configured';
+    }
+    if (githubAuthStatus) {
+        githubAuthStatus.textContent = hasPat ? 'Ready' : 'Not configured';
+    }
+}
 
 // ---- Serial State ----
 let port, reader, writer;
@@ -227,6 +298,69 @@ function startUiUpdateLoop() {
     }
 }
 
+// ---------------------------------------------------------
+// Toast Notifications (lightweight)
+// ---------------------------------------------------------
+function showToast(message, type = 'info', linkUrl = null) {
+    let container = document.getElementById('toastContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toastContainer';
+        container.style.position = 'fixed';
+        container.style.top = '16px';
+        container.style.right = '16px';
+        container.style.zIndex = '9999';
+        container.style.display = 'flex';
+        container.style.flexDirection = 'column';
+        container.style.gap = '8px';
+        document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.style.minWidth = '220px';
+    toast.style.maxWidth = '340px';
+    toast.style.padding = '10px 14px';
+    toast.style.borderRadius = '8px';
+    toast.style.fontSize = '0.85rem';
+    toast.style.background = 'rgba(15,23,42,0.95)';
+    toast.style.border = '1px solid rgba(148,163,184,0.6)';
+    toast.style.color = 'var(--text-primary)';
+    toast.style.boxShadow = '0 8px 20px rgba(0,0,0,0.4)';
+    toast.style.display = 'flex';
+    toast.style.flexDirection = 'column';
+    toast.style.gap = '4px';
+
+    if (type === 'success') {
+        toast.style.borderColor = 'rgba(16,185,129,0.6)';
+    } else if (type === 'error') {
+        toast.style.borderColor = 'rgba(239,68,68,0.7)';
+    }
+
+    const textEl = document.createElement('div');
+    textEl.textContent = message;
+    toast.appendChild(textEl);
+
+    if (linkUrl) {
+        const linkEl = document.createElement('a');
+        linkEl.href = linkUrl;
+        linkEl.textContent = 'Open link';
+        linkEl.target = '_blank';
+        linkEl.rel = 'noopener noreferrer';
+        linkEl.style.color = 'var(--accent)';
+        linkEl.style.textDecoration = 'underline';
+        linkEl.style.fontSize = '0.8rem';
+        toast.appendChild(linkEl);
+    }
+
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        if (toast.parentNode === container) {
+            container.removeChild(toast);
+        }
+    }, 4000);
+}
+
 function stopUiUpdateLoop() {
     updateLoopActive = false;
 }
@@ -282,10 +416,13 @@ async function sendMessageToCopilot(userText) {
     sendBtn.disabled = true;
 
     // Two-part payload: live telemetry JSON + raw CLI diff text
-    const systemPrompt = `You are Betaflight AI, the world's most helpful FPV drone configuration copilot. You have access to both live telemetry and the core configuration diff.
+    const systemPrompt = `You are Betaflight AI, the world's most helpful FPV drone configuration copilot. You have access to both live telemetry, a parsed dynamics snapshot, and the core configuration diff.
 
 ## PART 1: Live Telemetry (Real-time)
 ${JSON.stringify(droneState.live, null, 2)}
+
+## PART 1b: Dynamics Snapshot (PIDs, Rates, Filters)
+${JSON.stringify(droneState.dynamics || {}, null, 2)}
 
 ## PART 2: Configuration Diff (from CLI \`diff all\`)
 \`\`\`
@@ -303,7 +440,12 @@ ${droneState.cliDiff || '(Not yet synced — CLI diff has not been captured yet.
 - BLACKBOX INTENTS: If the user selects 'Filter & Noise Diagnostics', generate CLI commands: \`set debug_mode = GYRO_SCALED\` and \`set blackbox_sample_rate = 1/1\`. If they select 'General Flight & PIDs', generate: \`set debug_mode = NONE\`. If they select 'Disable Logging', generate: \`set blackbox_device = NONE\`. Always remind them to erase their flash memory before a tuning flight.
 - MOTOR DIAGNOSTICS: If a user asks why their drone flips instantly on takeoff, check their yaw_motors_reversed and mixer settings in the CLI dump. Explain that their physical props, physical motor spin direction, and the software yaw_motors_reversed toggle must all match exactly. Tell them to look at the 3D Motors visualizer tab to verify.
 - OSD TEMPLATES: If the user clicks an OSD template button, generate the CLI block to enable the relevant osd_..._pos elements based on their selected video system (Analog 30x16 vs HD 50x18). If they ask you for help aligning items (e.g. 'put my timer right below my voltage'), use their current droneState.cliDiff to find the voltage coordinates, calculate the row directly beneath it, and output the new CLI command with the correct position integer.
-- VTX CONFIGURATION: If the user asks to change their VTX channel, band, or power, output the exact \`set vtx_band\`, \`set vtx_channel\`, and \`set vtx_power\` CLI commands they need, in a markdown code block. Before suggesting these commands, inspect the CLI diff for signs of an HD Digital system (for example, \`osd_displayport_device\` using MSP DisplayPort or any non-zero/active HD device). If the dump indicates an HD Digital system, clearly explain that changing VTX channels or power via Betaflight CLI does not work on HD systems and that they must use their goggle menu instead.`;
+- SYMPTOM-BASED TUNING: When the user describes tuning symptoms (e.g. hot motors, propwash on descent, bounce-back, sluggish feel), always base your advice on the parsed droneState.dynamics JSON.
+- HOT MOTORS: For hot motors, always suggest lowering d_pitch and d_roll by about 10–15% from their current values. Also inspect dterm_lowpass_hz; if it is very high (e.g. > 150Hz) recommend reducing it modestly to reduce heat. Never suggest *increasing* any D-term when the symptom is hot motors.
+- PROPWASH SHAKES: For propwash shakes on descent, suggest small increases to d_pitch and d_roll (within safe limits) and/or reducing filter delay (for example, modestly raising gyro_lowpass_hz or dterm_lowpass_hz within reasonable ranges), while still respecting the D-term safety rule below.
+- CINEMATIC RATES: For cinematic feel, generate CLI commands to lower rc_rate (especially on roll and pitch) and increase rc_expo so the center stick is softer but full-stick authority is preserved. Explain the tradeoff in words and then output the CLI block.
+- SAFETY D-TERM LIMIT: Never increase any D-term value (d_roll, d_pitch, d_yaw) by more than 5 absolute points at a time. If the user's current D-term is already very high (e.g. above 50), recommend reductions instead of increases.
+- CLI OUTPUT FORMAT: For all tuning suggestions, always output the exact \`set [variable] = [value]\` and a \`save\` command inside a markdown code block, so the user can paste them directly into the Betaflight CLI.`;
 
     try {
         const resp = await fetch(
@@ -673,6 +815,7 @@ async function initializeDrone() {
         renderPortsTab();
         renderModesTab();
         renderPowerTab();
+        renderPidTab();
         renderVtxTab();
         renderBlackboxTab();
         renderMotorsTab();
@@ -882,6 +1025,24 @@ if (saveApiKeyBtn) {
     });
 }
 
+// Integration settings save handlers
+if (saveGoogleClientIdBtn && googleClientIdInput) {
+    saveGoogleClientIdBtn.addEventListener('click', () => {
+        setGoogleClientId(googleClientIdInput.value.trim());
+        updateIntegrationStatusUI();
+        showToast('Google Client ID saved locally.', 'success');
+    });
+}
+
+if (saveGithubPatBtn && githubPatInput && githubPublicDefaultToggle) {
+    saveGithubPatBtn.addEventListener('click', () => {
+        setGithubPat(githubPatInput.value.trim());
+        setGithubPublicDefault(!!githubPublicDefaultToggle.checked);
+        updateIntegrationStatusUI();
+        showToast('GitHub token preferences saved locally.', 'success');
+    });
+}
+
 debugToggle.addEventListener('change', () => {
     log.setEnabled(debugToggle.checked);
     logToConsole(`Debug logging ${debugToggle.checked ? 'enabled' : 'disabled'}`, 'info');
@@ -909,10 +1070,35 @@ sidebarItems.forEach(item => {
     });
 });
 
+// ---- Backup Tab Button Wiring ----
+if (btnExportLocal) {
+    btnExportLocal.addEventListener('click', () => {
+        exportLocalBackup();
+    });
+}
+if (btnExportDrive) {
+    btnExportDrive.addEventListener('click', () => {
+        const fileName = buildBackupFileName();
+        const content = getBackupContent();
+        saveToGoogleDrive(fileName, content);
+    });
+}
+if (btnExportGist) {
+    btnExportGist.addEventListener('click', () => {
+        const fileName = buildBackupFileName();
+        const content = getBackupContent();
+        publishToGitHub(fileName, content);
+    });
+}
+
 // ---- Init ----
 updateAiStatus();
 log.info('Betaflight AI System initialized. Awaiting connection...');
 logToConsole('Betaflight AI System initialized. Awaiting connection...', 'info');
+// Prefill integration fields from storage
+if (googleClientIdInput) googleClientIdInput.value = getGoogleClientId();
+if (githubPublicDefaultToggle) githubPublicDefaultToggle.checked = getGithubPublicDefault();
+updateIntegrationStatusUI();
 // ---------------------------------------------------------
 // Ports Tab Rendering
 // ---------------------------------------------------------
@@ -1006,6 +1192,287 @@ function renderPowerTab() {
 
     if (document.getElementById('valIbataScale')) document.getElementById('valIbataScale').textContent = pcfg.ibataScale;
     if (document.getElementById('valIbataOffset')) document.getElementById('valIbataOffset').textContent = pcfg.ibataOffset;
+}
+
+// ---------------------------------------------------------
+// Backup Tab — Export routing
+// ---------------------------------------------------------
+function buildBackupFileName() {
+    const boardName = droneState.firmwareIdentifier || 'Betaflight';
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return `Betaflight_Backup_${boardName}_${yyyy}-${mm}-${dd}.txt`;
+}
+
+function getBackupContent() {
+    return droneState.cliDiff || '# No CLI diff captured yet.\n';
+}
+
+function exportLocalBackup() {
+    const fileName = buildBackupFileName();
+    const content = getBackupContent();
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('Configuration downloaded as text file.', 'success');
+}
+
+async function ensureGoogleDriveAuth() {
+    const clientId = getGoogleClientId();
+    if (!clientId) {
+        alert('Google Drive Client ID is not configured. Open Settings → Integrations to add it.');
+        return false;
+    }
+    if (typeof gapi === 'undefined') {
+        alert('Google API client (gapi) failed to load. Check your network or script settings.');
+        return false;
+    }
+
+    if (!gapi.auth2 || !gapi.auth2.getAuthInstance) {
+        await new Promise((resolve, reject) => {
+            gapi.load('client:auth2', {
+                callback: resolve,
+                onerror: () => reject(new Error('Failed to load gapi client/auth2'))
+            });
+        });
+        await gapi.client.init({
+            clientId,
+            scope: 'https://www.googleapis.com/auth/drive.file'
+        });
+    }
+
+    const auth = gapi.auth2.getAuthInstance();
+    if (!auth) {
+        alert('Google auth instance failed to initialize.');
+        return false;
+    }
+    if (!auth.isSignedIn.get()) {
+        await auth.signIn();
+    }
+    googleDriveAuthed = true;
+    updateIntegrationStatusUI();
+    return true;
+}
+
+async function saveToGoogleDrive(fileName, fileContent) {
+    const ok = await ensureGoogleDriveAuth();
+    if (!ok) return;
+
+    const metadata = {
+        name: fileName,
+        mimeType: 'text/plain'
+    };
+    const boundary = '-------314159265358979323846';
+    const delimiter = `\r\n--${boundary}\r\n`;
+    const closeDelimiter = `\r\n--${boundary}--`;
+
+    const body =
+        delimiter +
+        'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+        JSON.stringify(metadata) +
+        delimiter +
+        'Content-Type: text/plain; charset=UTF-8\r\n\r\n' +
+        fileContent +
+        closeDelimiter;
+
+    try {
+        const resp = await gapi.client.request({
+            path: 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+            method: 'POST',
+            headers: {
+                'Content-Type': `multipart/related; boundary=${boundary}`
+            },
+            body
+        });
+        if (resp && resp.result && resp.result.id) {
+            showToast('Backup saved to Google Drive.', 'success');
+        } else {
+            showToast('Google Drive export completed, but response was unexpected.', 'info');
+        }
+    } catch (err) {
+        log.error('Google Drive export failed', err);
+        showToast('Failed to save to Google Drive. See System Logs.', 'error');
+    }
+}
+
+async function publishToGitHub(fileName, fileContent) {
+    const pat = getGithubPat();
+    if (!pat) {
+        alert('GitHub Personal Access Token is not configured. Open Settings → Integrations to add it.');
+        return;
+    }
+
+    const makePublic = getGithubPublicDefault();
+
+    const payload = {
+        description: `Betaflight backup: ${fileName}`,
+        public: makePublic,
+        files: {}
+    };
+    payload.files[fileName] = { content: fileContent };
+
+    try {
+        const resp = await fetch('https://api.github.com/gists', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `token ${pat}`
+            },
+            body: JSON.stringify(payload)
+        });
+        if (!resp.ok) {
+            const text = await resp.text();
+            log.error('GitHub Gist error', text);
+            showToast('GitHub Gist export failed. See System Logs.', 'error');
+            return;
+        }
+        const data = await resp.json();
+        const url = data.html_url || '';
+        showToast('Backup published to GitHub Gist.', 'success', url || null);
+    } catch (err) {
+        log.error('GitHub Gist export failed', err);
+        showToast('GitHub Gist export failed. See System Logs.', 'error');
+    }
+}
+
+// ---------------------------------------------------------
+// PID Tuning & Rates Tab Rendering
+// ---------------------------------------------------------
+function renderPidTab() {
+    if (!window.CliParser || !droneState.cliDiff) return;
+
+    const dyn = window.CliParser.parseDynamics(droneState.cliDiff);
+    if (!dyn) return;
+
+    droneState.dynamics = dyn;
+
+    const pidProfileEl = document.getElementById('pidProfileValue');
+    const rateProfileEl = document.getElementById('rateProfileValue');
+    if (pidProfileEl) pidProfileEl.textContent = String(dyn.profile);
+    if (rateProfileEl) rateProfileEl.textContent = String(dyn.rateProfile);
+
+    // Rates table
+    const rateAxes = ['roll', 'pitch', 'yaw'];
+    rateAxes.forEach(axis => {
+        const rates = dyn.rates[axis];
+        if (!rates) return;
+        const prefix = axis.charAt(0).toUpperCase() + axis.slice(1);
+        const rcRateEl = document.getElementById(`pid${prefix}RcRate`);
+        const superRateEl = document.getElementById(`pid${prefix}SuperRate`);
+        const expoEl = document.getElementById(`pid${prefix}Expo`);
+        if (rcRateEl) rcRateEl.textContent = rates.rcRate !== null ? String(rates.rcRate) : '—';
+        if (superRateEl) superRateEl.textContent = rates.superRate !== null ? String(rates.superRate) : '—';
+        if (expoEl) expoEl.textContent = rates.expo !== null ? String(rates.expo) : '—';
+    });
+
+    // PID table
+    const pidAxes = ['roll', 'pitch', 'yaw'];
+    pidAxes.forEach(axis => {
+        const pid = dyn.pids[axis];
+        if (!pid) return;
+        const Prefix = axis.charAt(0).toUpperCase() + axis.slice(1);
+        const pEl = document.getElementById(`pid${Prefix}P`);
+        const iEl = document.getElementById(`pid${Prefix}I`);
+        const dEl = document.getElementById(`pid${Prefix}D`);
+        const fEl = document.getElementById(`pid${Prefix}F`);
+        if (pEl) pEl.textContent = pid.p !== null ? String(pid.p) : '—';
+        if (iEl) iEl.textContent = pid.i !== null ? String(pid.i) : '—';
+        if (dEl) dEl.textContent = pid.d !== null ? String(pid.d) : '—';
+        if (fEl) fEl.textContent = pid.f !== null ? String(pid.f) : '—';
+    });
+
+    // Rates chart (simple Bezier curve based on expo)
+    const canvas = document.getElementById('ratesChart');
+    if (canvas && canvas.getContext) {
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width || canvas.clientWidth || 400;
+        const height = canvas.height || 200;
+
+        // Clear
+        ctx.clearRect(0, 0, width, height);
+
+        // Background
+        ctx.fillStyle = '#020617';
+        ctx.fillRect(0, 0, width, height);
+
+        // Grid
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, height - 1);
+        ctx.lineTo(width, height - 1);
+        ctx.moveTo(1, 0);
+        ctx.lineTo(1, height);
+        ctx.stroke();
+
+        // Use pitch expo as representative
+        const expo = dyn.rates.pitch && typeof dyn.rates.pitch.expo === 'number' ? dyn.rates.pitch.expo : 0;
+        const expoNorm = Math.max(0, Math.min(1, expo));
+
+        // Control points for Bezier (0,0) to (1,1) shaped by expo
+        const p0 = { x: 0, y: height };
+        const p3 = { x: width, y: 0 };
+        const p1 = { x: width * 0.3, y: height * (1 - 0.6 * expoNorm) };
+        const p2 = { x: width * 0.7, y: height * (0.4 + 0.4 * expoNorm) };
+
+        ctx.strokeStyle = '#0ea5e9';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(p0.x, p0.y);
+
+        const steps = 40;
+        for (let i = 1; i <= steps; i++) {
+            const t = i / steps;
+            const x =
+                Math.pow(1 - t, 3) * p0.x +
+                3 * Math.pow(1 - t, 2) * t * p1.x +
+                3 * (1 - t) * Math.pow(t, 2) * p2.x +
+                Math.pow(t, 3) * p3.x;
+            const y =
+                Math.pow(1 - t, 3) * p0.y +
+                3 * Math.pow(1 - t, 2) * t * p1.y +
+                3 * (1 - t) * Math.pow(t, 2) * p2.y +
+                Math.pow(t, 3) * p3.y;
+            ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+    }
+
+    // Symptom badges wiring
+    document.querySelectorAll('.symptom-badge').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const prompt = btn.getAttribute('data-symptom-prompt');
+            if (!prompt || !chatInput) return;
+            chatInput.value = prompt;
+            chatInput.focus();
+        });
+    });
+
+    // Template buttons wiring (prompt only, AI will turn into CLI)
+    document.querySelectorAll('.pid-template-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const template = btn.getAttribute('data-template');
+            if (!template || !chatInput) return;
+            let text = '';
+            if (template === 'cinematic') {
+                text = 'I want cinematic, smooth rates with softer center stick and reduced max rotation speed. Please suggest safe RC rate and expo changes for all axes and give me the CLI commands.';
+            } else if (template === 'race') {
+                text = 'I want aggressive race rates with fast roll and pitch but still controllable around center. Please suggest safe RC rate, super rate, and expo values and give me the CLI commands.';
+            }
+            if (text) {
+                chatInput.value = text;
+                chatInput.focus();
+            }
+        });
+    });
 }
 
 // ---------------------------------------------------------

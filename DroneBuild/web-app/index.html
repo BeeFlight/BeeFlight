@@ -62,6 +62,7 @@
                             <li data-view="view-motors">Motors</li>
                             <li data-view="view-osd">OSD</li>
                             <li data-view="view-vtx">Video Transmitter</li>
+                            <li data-view="tabBackup">Backup</li>
                         </ul>
                     </nav>
 
@@ -595,8 +596,49 @@
                             </div>
                         </div>
 
-                        <!-- Legacy hook for agents/QA expecting a tabVTX container -->
+                        <div id="tabBackup" class="tab-view">
+                            <h2 class="tab-title">Backup &amp; Export</h2>
+
+                            <div class="backup-layout">
+                                <div class="data-card">
+                                    <div class="card-header">Export Current Configuration</div>
+                                    <div class="card-body">
+                                        <p class="backup-copy">
+                                            Export your current Betaflight configuration diff so you can restore it
+                                            later or share it safely with others.
+                                        </p>
+
+                                        <div class="backup-export-row">
+                                            <button id="btnExportLocal" class="backup-export-btn">
+                                                <span class="backup-icon">💾</span>
+                                                <span class="backup-label">Download Local (.txt)</span>
+                                            </button>
+
+                                            <div class="backup-cloud-option">
+                                                <button id="btnExportDrive" class="backup-export-btn">
+                                                    <span class="backup-icon">☁️</span>
+                                                    <span class="backup-label">Save to Google Drive</span>
+                                                </button>
+                                                <span id="driveAuthStatus" class="auth-status-pill">Not connected</span>
+                                            </div>
+
+                        <div class="backup-cloud-option">
+                                                <button id="btnExportGist" class="backup-export-btn">
+                                                    <span class="backup-icon">🐙</span>
+                                                    <span class="backup-label">Publish to GitHub (Gist)</span>
+                                                </button>
+                                                <span id="githubAuthStatus" class="auth-status-pill">Not
+                                                    configured</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Legacy hooks for agents/QA expecting legacy tab containers -->
                         <div id="tabVTX" class="tab-pane hidden"></div>
+                        <div id="tabPID" class="tab-pane hidden"></div>
 
                     </div> <!-- End Dashboard Views -->
                 </div> <!-- End Dashboard Layout -->
@@ -675,6 +717,46 @@
                     <span class="setting-label">Export debug log file</span>
                     <button id="downloadLogBtn" class="btn-secondary">Download Debug Log</button>
                 </div>
+                <hr style="border-color: var(--border-subtle); opacity: 0.4; margin: 12px 0;">
+                <div class="setting-row" style="flex-direction: column; align-items: stretch; gap: 6px;">
+                    <span class="setting-label">Integrations</span>
+                    <small style="color: var(--text-muted); font-size: 0.75rem;">
+                        Manage cloud export connections. Keys and tokens are stored locally in your browser only.
+                    </small>
+                </div>
+                <div class="setting-row" style="flex-direction: column; align-items: stretch; gap: 6px;">
+                    <span class="setting-label">Google Drive</span>
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <input type="text" id="googleClientIdInput" class="input-field"
+                            placeholder="Google OAuth Client ID (for Drive exports)"
+                            style="background: var(--bg-main); border: 1px solid var(--border-subtle); color: var(--text-primary); padding: 6px 10px; border-radius: 6px; font-size: 0.85rem;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <button id="saveGoogleClientIdBtn" class="btn-secondary"
+                                style="font-size: 0.8rem;">Save Client ID</button>
+                            <span id="googleStatusLabel" style="font-size: 0.8rem; color: var(--text-muted);">Not
+                                connected</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="setting-row" style="flex-direction: column; align-items: stretch; gap: 6px;">
+                    <span class="setting-label">GitHub Gists</span>
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <input type="password" id="githubPatInput" class="input-field"
+                            placeholder="GitHub Personal Access Token (for Gists)"
+                            style="background: var(--bg-main); border: 1px solid var(--border-subtle); color: var(--text-primary); padding: 6px 10px; border-radius: 6px; font-size: 0.85rem;">
+                        <label
+                            style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--text-muted);">
+                            <input type="checkbox" id="githubPublicDefaultToggle">
+                            <span>Make new Gists public by default</span>
+                        </label>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <button id="saveGithubPatBtn" class="btn-secondary" style="font-size: 0.8rem;">Save
+                                Token</button>
+                            <span id="githubStatusLabel" style="font-size: 0.8rem; color: var(--text-muted);">Not
+                                configured</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -683,6 +765,7 @@
     <div id="qa-test-results" class="hidden" style="display:none;"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://apis.google.com/js/api.js"></script>
     <script src="logger.js"></script>
     <script src="mspProtocol.js"></script>
     <script src="cliParser.js"></script>
