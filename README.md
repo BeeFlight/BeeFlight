@@ -29,8 +29,8 @@ This application uses a unique "Hybrid Data Architecture" to deliver both real-t
 
 ## ✨ Key Features & Modules
 
-### 🤖 The AI Copilot
-A persistent chat interface fixed to the right side of the screen. The Copilot is context-aware, meaning it knows exactly what drone you plugged in. Ask it to "change my VTX to Raceband 8" or "calculate my voltage scale," and it will generate the exact Betaflight CLI commands required.
+### 🤖 The AI Copilot (Agent Mode)
+A persistent chat interface fixed to the right side of the screen. The Copilot is context-aware, meaning it knows exactly what drone you plugged in. Ask it to "change my VTX to Raceband 8" or "bump up my pitch P a little," and it generates structured **Action Cards**: human-readable summaries plus the exact CLI commands, wrapped in a JSON `action` block for **Approve & Flash** / **Undo (Rollback)** flows.
 
 ### 📊 Modern, Read-Only Dashboards
 The legacy left-hand tabs have been completely redesigned into semantic, read-only status hubs:
@@ -43,11 +43,34 @@ The legacy left-hand tabs have been completely redesigned into semantic, read-on
 * **OSD (Hybrid Canvas):** Features one-click AI templates ("Apply Long Range Layout") alongside a smart drag-and-drop HTML canvas that automatically supports both HD Digital and Analog grid sizes.
 * **Blackbox:** Intent-driven configuration ("Diagnose Filters" vs. "General Flight") and one-click Mass Storage (MSC) mounting.
 * **VTX:** Intelligently detects if you are using Analog (SmartAudio) or HD Digital (MSP DisplayPort) and adapts the UI to prevent useless CLI commands.
+* **PID Tuning & Rates:** Read-only snapshot of PID gains, rates, and filter cutoffs, plus an AI-powered *Symptom-Based* tuner (e.g. "hot motors", "propwash on descent") that proposes safe Action Cards instead of raw CLI.
+* **Backup:** Dedicated Backup tab for exporting configuration to **local .txt**, **Google Drive**, or **GitHub Gists** (secret by default), with integration settings managed in the app’s Settings modal.
 
 ### 🧪 Zero-Friction Automated Testing
 Includes an integrated `localStorage` mock-data pipeline. Developers can click "Capture Live Drone," save the physical drone's exact CLI dump to the browser's memory, and run autonomous QA Agent testing without needing the drone plugged in.
 
 ---
+
+## 🧬 Backup, Restore & Time Machine
+
+BeeFlight AI includes a full **backup/restore pipeline** designed around safety and reversibility:
+
+- **Multi-destination export:** One-click export of the live `diff all` to:
+  - Local download (`.txt` file with board name + date)
+  - Google Drive (via Drive API with `drive.file` scope)
+  - GitHub Gists (PAT-based auth, secret by default unless you opt-in to public)
+- **AI Pre-Flight Checklist (Restore):**
+  - When you select a backup file, only a small header/tail snippet is sent to Gemini, along with live `board_name` and firmware version.
+  - The **Betaflight Safety Inspector** returns a strict JSON object with:
+    - `hardwareMatch` — does the backup target match the connected FC?
+    - `versionMatch` — are Betaflight major/minor versions compatible?
+    - `fileIntegrity` — does it look like a valid dump, ending in `save`?
+    - `motorSafety` — is the motor protocol a DSHOT variant?
+  - A visual checklist in the UI must pass all four items before the "Overwrite Current Settings" button unlocks.
+- **Safe line-by-line flasher:** Restores run through a guarded CLI pipeline that:
+  - Enters CLI mode, sends each line with small delays, tracks progress, then issues a final `save`.
+  - Handles FC reboot gracefully and guides the user to reconnect.
+- **Session History & Undo:** Every AI Action Card approval snapshots the previous CLI dump into `sessionHistory`. If something feels wrong, the **Undo (Rollback)** button uses the same flasher to replay the last known-good configuration, then marks the card as **“⏪ Rollback Complete”**.
 
 ## 🚀 Getting Started
 
