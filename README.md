@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="DroneBuild/web-app/logo.png" alt="Betaflight AI bee logo" width="180" />
+  <img src="DroneBuild/logo.png" alt="BeeFlight AI bee logo" width="180" />
 </p>
 
-# 🦅 Betaflight AI
+# 🐝 BeeFlight AI
 
 **The intelligent, conversational copilot for FPV drone configuration.**
 
-Betaflight AI is a modern web application that reimagines the traditional flight controller setup process. By replacing dense, spreadsheet-like tables with an AI-driven, intent-based interface, this project democratizes FPV drone building and tuning for beginners while streamlining workflows for advanced pilots.
+BeeFlight AI is a modern web application that reimagines the traditional flight controller setup process. By replacing dense, spreadsheet-like tables with an AI-driven, intent-based interface, this project democratizes FPV drone building and tuning for beginners while streamlining workflows for advanced pilots.
 
 ---
 
@@ -14,7 +14,7 @@ Betaflight AI is a modern web application that reimagines the traditional flight
 
 The standard open-source Betaflight Configurator is incredibly powerful, but it requires deep prerequisite knowledge of UART bitmasks, PID loops, filters, and CLI commands. 
 
-**Betaflight AI aims to bridge that knowledge gap.** Instead of forcing users to hunt for obscure settings, the app uses the Web Serial API to extract the drone's entire configuration and feeds it to a Google Gemini-powered Copilot. You don't need to know how to calculate a voltage divider or write a `set osd_vbat_pos` command—you just tell the AI what you want to do, and it handles the math and syntax for you.
+**BeeFlight AI aims to bridge that knowledge gap.** Instead of forcing users to hunt for obscure settings, the app uses the Web Serial API to extract the drone's entire configuration and feeds it to a Google Gemini-powered Copilot. You don't need to know how to calculate a voltage divider or write a `set osd_vbat_pos` command—you just tell the AI what you want to do, and it handles the math and syntax for you.
 
 ---
 

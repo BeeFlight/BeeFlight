@@ -416,7 +416,7 @@ async function sendMessageToCopilot(userText) {
     sendBtn.disabled = true;
 
     // Two-part payload: live telemetry JSON + raw CLI diff text
-    const systemPrompt = `You are Betaflight AI, the world's most helpful FPV drone configuration copilot. You have access to both live telemetry, a parsed dynamics snapshot, and the core configuration diff.
+    const systemPrompt = `You are BeeFlight AI, the world's most helpful FPV drone configuration copilot. You have access to both live telemetry, a parsed dynamics snapshot, and the core configuration diff.
 
 ## PART 1: Live Telemetry (Real-time)
 ${JSON.stringify(droneState.live, null, 2)}
@@ -806,7 +806,7 @@ async function initializeDrone() {
     appendChatMessage('ai',
         `Connected to ${droneState.firmwareIdentifier} v${droneState.firmwareVersion}! ` +
         (droneState.cliDiff
-            ? `I have your full config diff (${droneState.cliDiff.length} chars). Ask me anything — PIDs, filters, rates, UARTs — I have the full picture.`
+            ? `I have your full config diff (${droneState.cliDiff.length} chars). Ask me anything — PIDs, filters, rates, UARTs — BeeFlight AI has the full picture.`
             : `Live telemetry is active. Ask me anything!`)
     );
 
@@ -1093,8 +1093,8 @@ if (btnExportGist) {
 
 // ---- Init ----
 updateAiStatus();
-log.info('Betaflight AI System initialized. Awaiting connection...');
-logToConsole('Betaflight AI System initialized. Awaiting connection...', 'info');
+log.info('BeeFlight AI System initialized. Awaiting connection...');
+logToConsole('BeeFlight AI System initialized. Awaiting connection...', 'info');
 // Prefill integration fields from storage
 if (googleClientIdInput) googleClientIdInput.value = getGoogleClientId();
 if (githubPublicDefaultToggle) githubPublicDefaultToggle.checked = getGithubPublicDefault();

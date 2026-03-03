@@ -1,7 +1,7 @@
 {
     "name": "betaflight-ai-webapp",
     "version": "1.0.0",
-    "description": "Betaflight AI Configurator Web Interface",
+    "description": "BeeFlight AI Configurator Web Interface",
     "scripts": {
         "start": "live-server --port=3000 --cors",
         "serve": "http-server -p 3000 --cors"
