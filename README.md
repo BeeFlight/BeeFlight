@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="DroneBuild/logo.png" alt="BeeFlight AI bee logo" width="180" />
+  <img src="docs/logo.png" alt="BeeFlight AI bee logo" width="180" />
 </p>
 
 # 🐝 BeeFlight AI
