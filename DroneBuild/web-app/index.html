@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Betaflight AI</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="chat-styles.css">
+    <link rel="stylesheet" href="dashboard-styles.css">
+    <link rel="stylesheet" href="telemetry-styles.css">
+    <link rel="stylesheet" href="settings-styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Left Panel: Drone Dashboard -->
+        <main class="panel dashboard-panel">
+            <header class="panel-header">
+                <h1>Betaflight AI</h1>
+                <div class="header-actions">
+                    <div class="status-badge" id="connectionStatus">Disconnected</div>
+                    <button id="settingsBtn" class="btn-icon" title="Settings">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <circle cx="12" cy="12" r="3" />
+                            <path
+                                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                        </svg>
+                    </button>
+                </div>
+            </header>
+
+            <div class="dashboard-content">
+                <!-- Pre-Connect: Big Connect Button -->
+                <div id="connectSection" class="connect-section">
+                    <button id="connectBtn" class="btn-primary btn-large">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                        </svg>
+                        Connect to Drone
+                    </button>
+                    <p class="help-text">115200 baud • Web Serial API</p>
+                </div>
+
+                <!-- Post-Connect: Read-Only Dashboard -->
+                <div id="dashboardLayout" class="dashboard-layout hidden">
+                    <!-- Sidebar Navigation -->
+                    <nav class="sidebar-menu" id="sidebarMenu">
+                        <ul>
+                            <li class="active" data-view="view-setup">Setup</li>
+                            <li data-view="view-ports">Ports</li>
+                            <li data-view="view-configuration">Configuration</li>
+                            <li data-view="view-power">Power</li>
+                            <li data-view="view-pids">PID Tuning</li>
+                            <li data-view="view-receiver">Receiver</li>
+                            <li data-view="view-modes">Modes</li>
+                            <li data-view="view-blackbox">Blackbox</li>
+                            <li data-view="view-motors">Motors</li>
+                            <li data-view="view-osd">OSD</li>
+                            <li data-view="view-vtx">Video Transmitter</li>
+                        </ul>
+                    </nav>
+
+                    <!-- Main Content Views -->
+                    <div class="dashboard-views" id="dashboardViews">
+
+                        <!-- SETUP TAB -->
+                        <div id="view-setup" class="tab-view active dashboard-cards">
+                            <!-- Firmware Info Card (Retained from Phase 5) -->
+                            <div class="data-card">
+                                <div class="card-header">Firmware Info</div>
+                                <div class="card-body">
+                                    <div class="data-row"><span class="data-label">Identifier</span><span
+                                            class="data-value" id="valFirmware">—</span></div>
+                                    <div class="data-row"><span class="data-label">Version</span><span
+                                            class="data-value" id="valVersion">—</span></div>
+                                    <div class="data-row"><span class="data-label">MSP API</span><span
+                                            class="data-value" id="valMspApi">—</span></div>
+                                </div>
+                            </div>
+
+                            <!-- System Info Card -->
+                            <div class="data-card">
+                                <div class="card-header">System Info</div>
+                                <div class="card-body">
+                                    <div class="data-row"><span class="data-label">Battery Voltage</span><span
+                                            class="data-value" id="valBattery">0.0 V</span></div>
+                                    <div class="data-row"><span class="data-label">CPU Load</span><span
+                                            class="data-value" id="valCpuLoad">—</span></div>
+                                    <div class="data-row"><span class="data-label">Arming Flag</span><span
+                                            class="data-value" id="valArmed">—</span></div>
+                                </div>
+                            </div>
+
+                            <!-- Instruments Card -->
+                            <div class="data-card card-wide">
+                                <div class="card-header">Instruments</div>
+                                <div class="card-body instruments-wrapper">
+                                    <div class="instrument-box">
+                                        <div class="inst-label">Roll</div>
+                                        <div class="inst-value" id="instRoll">0.0°</div>
+                                    </div>
+                                    <div class="instrument-box">
+                                        <div class="inst-label">Pitch</div>
+                                        <div class="inst-value" id="instPitch">0.0°</div>
+                                    </div>
+                                    <div class="instrument-box">
+                                        <div class="inst-label">Yaw</div>
+                                        <div class="inst-value" id="instYaw">0°</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div> <!-- End View Setup -->
+
+                        <!-- PORTS TAB -->
+                        <div id="view-ports" class="tab-view">
+                            <h2 class="tab-title">Ports & Peripherals</h2>
+                            <div class="ports-list-container">
+                                <ul id="portsList" class="ports-list">
+                                    <!-- Populated by cliParser.js -->
+                                    <li class="port-item placeholder">Waiting for CLI Sync...</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div id="view-configuration" class="tab-view">
+                            <h2 class="tab-title">Configuration</h2>
+                            <p class="tab-placeholder">System configuration limits and features coming soon...</p>
+                        </div>
+                        <div id="view-power" class="tab-view dashboard-cards">
+                            <!-- Live Telemetry -->
+                            <div class="data-card telemetry-card">
+                                <div class="card-header">Live Telemetry</div>
+                                <div class="card-body power-telemetry">
+                                    <div class="telemetry-block">
+                                        <div class="telemetry-value" id="valLiveVoltage">0.0 V</div>
+                                        <div class="telemetry-label">Total Voltage</div>
+                                    </div>
+                                    <div class="telemetry-block">
+                                        <div class="telemetry-value" id="valLiveAmperage">0.00 A</div>
+                                        <div class="telemetry-label">Current Draw</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Cell Limits -->
+                            <div class="data-card">
+                                <div class="card-header">Cell Limits</div>
+                                <div class="card-body">
+                                    <div class="data-row"><span class="data-label">Max Cell Voltage</span><span
+                                            class="data-value" id="valVbatMax">—</span></div>
+                                    <div class="data-row"><span class="data-label">Warning Voltage</span><span
+                                            class="data-value" id="valVbatWarn">—</span></div>
+                                    <div class="data-row"><span class="data-label">Min Cell Voltage</span><span
+                                            class="data-value" id="valVbatMin">—</span></div>
+                                </div>
+                            </div>
+
+                            <!-- Sensor Calibration -->
+                            <div class="data-card">
+                                <div class="card-header">Sensor Calibration</div>
+                                <div class="card-body">
+                                    <div class="data-row"><span class="data-label">Voltage Scale</span><span
+                                            class="data-value" id="valVbatScale">—</span></div>
+                                    <div class="data-row"><span class="data-label">Voltage Divider</span><span
+                                            class="data-value" id="valVbatDivider">—</span></div>
+                                    <div class="data-row"><span class="data-label">Voltage Multiplier</span><span
+                                            class="data-value" id="valVbatMultiplier">—</span></div>
+                                    <div class="data-row"><span class="data-label">Amperage Scale</span><span
+                                            class="data-value" id="valIbataScale">—</span></div>
+                                    <div class="data-row"><span class="data-label">Amperage Offset</span><span
+                                            class="data-value" id="valIbataOffset">—</span></div>
+                                </div>
+                            </div>
+
+                            <!-- AI Hook -->
+                            <div class="data-card card-wide ai-hook-card">
+                                <div class="card-header">Calibration Assistant</div>
+                                <div class="card-body">
+                                    <p>Calibration is now handled by the Copilot. Measure your battery with a multimeter
+                                        and tell the AI:</p>
+                                    <blockquote
+                                        style="border-left: 3px solid var(--accent); padding-left: 10px; color: var(--text-secondary); margin-top: 10px; font-style: italic;">
+                                        "My multimeter reads 16.2V but the dashboard says 15.8V."
+                                    </blockquote>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="view-pids" class="tab-view">
+                            <h2 class="tab-title">PID Tuning</h2>
+                            <p class="tab-placeholder">Advanced PID configuration and filter profiles coming soon...</p>
+                        </div>
+
+                        <!-- RECEIVER TAB -->
+                        <div id="view-receiver" class="tab-view">
+                            <h2 class="tab-title">Receiver Channels</h2>
+                            <div class="rc-visualizer">
+                                <div class="rc-channel"><span class="rc-label">Roll (A)</span>
+                                    <div class="rc-bar-wrapper">
+                                        <div class="rc-bar-fill map-axis" id="barRoll"></div>
+                                    </div><span class="rc-val" id="valRcRoll">1500</span>
+                                </div>
+                                <div class="rc-channel"><span class="rc-label">Pitch (E)</span>
+                                    <div class="rc-bar-wrapper">
+                                        <div class="rc-bar-fill map-axis" id="barPitch"></div>
+                                    </div><span class="rc-val" id="valRcPitch">1500</span>
+                                </div>
+                                <div class="rc-channel"><span class="rc-label">Yaw (R)</span>
+                                    <div class="rc-bar-wrapper">
+                                        <div class="rc-bar-fill map-axis" id="barYaw"></div>
+                                    </div><span class="rc-val" id="valRcYaw">1500</span>
+                                </div>
+                                <div class="rc-channel"><span class="rc-label">Throttle (T)</span>
+                                    <div class="rc-bar-wrapper">
+                                        <div class="rc-bar-fill map-throttle" id="barThrottle"></div>
+                                    </div><span class="rc-val" id="valRcThrottle">1000</span>
+                                </div>
+                                <div class="rc-channel"><span class="rc-label">AUX 1</span>
+                                    <div class="rc-bar-wrapper">
+                                        <div class="rc-bar-fill map-aux" id="barAux1"></div>
+                                    </div><span class="rc-val" id="valRcAux1">1500</span>
+                                </div>
+                                <div class="rc-channel"><span class="rc-label">AUX 2</span>
+                                    <div class="rc-bar-wrapper">
+                                        <div class="rc-bar-fill map-aux" id="barAux2"></div>
+                                    </div><span class="rc-val" id="valRcAux2">1500</span>
+                                </div>
+                                <div class="rc-channel"><span class="rc-label">AUX 3</span>
+                                    <div class="rc-bar-wrapper">
+                                        <div class="rc-bar-fill map-aux" id="barAux3"></div>
+                                    </div><span class="rc-val" id="valRcAux3">1500</span>
+                                </div>
+                                <div class="rc-channel"><span class="rc-label">AUX 4</span>
+                                    <div class="rc-bar-wrapper">
+                                        <div class="rc-bar-fill map-aux" id="barAux4"></div>
+                                    </div><span class="rc-val" id="valRcAux4">1500</span>
+                                </div>
+                            </div>
+                        </div> <!-- End View Receiver -->
+                        <!-- MODES TAB -->
+                        <div id="view-modes" class="tab-view">
+                            <h2 class="tab-title">Active Modes</h2>
+                            <div class="modes-container">
+                                <div id="modesGrid" class="modes-grid">
+                                    <div class="mode-item placeholder">Waiting for CLI Sync...</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- BLACKBOX TAB -->
+                        <div id="view-blackbox" class="tab-view dashboard-cards">
+                            <h2 class="tab-title">Blackbox Insights & Intent</h2>
+
+                            <!-- Intents Row -->
+                            <div class="blackbox-intents">
+                                <div class="intent-card" data-intent="general">
+                                    <div class="intent-icon">🎯</div>
+                                    <h3>General Flight & PIDs</h3>
+                                    <p>Standard tracking (debug_mode = NONE)</p>
+                                </div>
+                                <div class="intent-card" data-intent="filters">
+                                    <div class="intent-icon">🚁</div>
+                                    <h3>Filter & Noise Diagnostics</h3>
+                                    <p>Sets GYRO_SCALED & max sample rate</p>
+                                </div>
+                                <div class="intent-card" data-intent="disable">
+                                    <div class="intent-icon">🛑</div>
+                                    <h3>Disable Logging</h3>
+                                    <p>Saves storage space</p>
+                                </div>
+                            </div>
+
+                            <!-- Storage Control Row -->
+                            <div class="data-card blackbox-storage">
+                                <div class="card-header">Flash Storage Device</div>
+                                <div class="card-body">
+                                    <div class="storage-info">
+                                        <div class="data-row"><span class="data-label">Selected Device:</span><span
+                                                class="data-value" id="valBboxDevice">Scanning...</span></div>
+                                        <div class="data-row"><span class="data-label">Rate / Debug:</span><span
+                                                class="data-value" id="valBboxRate">Scanning...</span></div>
+                                    </div>
+                                    <div class="storage-actions">
+                                        <button id="btnMountMsc" class="btn-primary"
+                                            style="background: var(--accent-purple); border-color: var(--accent-purple);">Mount
+                                            as USB Drive (Download Logs)</button>
+                                        <button id="btnEraseFlash" class="btn-danger">Erase Flash</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- AI Analyzer Dropzone -->
+                            <div class="ai-dropzone" id="bblDropzone">
+                                <p>Drop your <strong>.bbl</strong> log file here for AI Tuning Analysis (Coming Soon)
+                                </p>
+                            </div>
+                        </div>
+                        <div id="view-motors" class="tab-view dashboard-cards">
+                            <h2 class="tab-title">Motors & Mixing</h2>
+
+                            <!-- Config Summary Row -->
+                            <div class="motor-config-row">
+                                <div class="data-card">
+                                    <div class="card-header">ESC Protocol</div>
+                                    <div class="card-body"><span class="data-value motor-config-val"
+                                            id="valEscProtocol">—</span></div>
+                                </div>
+                                <div class="data-card">
+                                    <div class="card-header">Bidirectional DSHOT</div>
+                                    <div class="card-body"><span class="data-value motor-config-val"
+                                            id="valBidir">—</span></div>
+                                </div>
+                                <div class="data-card">
+                                    <div class="card-header">Motor Poles</div>
+                                    <div class="card-body"><span class="data-value motor-config-val"
+                                            id="valMotorPoles">—</span></div>
+                                </div>
+                            </div>
+
+                            <!-- 3D Visualizer -->
+                            <div class="motor-3d-wrapper">
+                                <div id="motor3DCanvas" class="canvas-container"
+                                    style="height: 400px; position: relative;"></div>
+                                <div class="canvas-overlay">
+                                    <span class="overlay-label">🔄 CW / CCW Rotation · Props In / Props Out</span>
+                                </div>
+                            </div>
+
+                            <!-- Live RPM Telemetry -->
+                            <div class="rpm-grid">
+                                <div class="rpm-block">
+                                    <div class="rpm-label">Motor 1 (FR)</div>
+                                    <div class="rpm-value" id="rpmMotor1">0</div>
+                                    <div class="rpm-unit">RPM</div>
+                                </div>
+                                <div class="rpm-block">
+                                    <div class="rpm-label">Motor 2 (FL)</div>
+                                    <div class="rpm-value" id="rpmMotor2">0</div>
+                                    <div class="rpm-unit">RPM</div>
+                                </div>
+                                <div class="rpm-block">
+                                    <div class="rpm-label">Motor 3 (BR)</div>
+                                    <div class="rpm-value" id="rpmMotor3">0</div>
+                                    <div class="rpm-unit">RPM</div>
+                                </div>
+                                <div class="rpm-block">
+                                    <div class="rpm-label">Motor 4 (BL)</div>
+                                    <div class="rpm-value" id="rpmMotor4">0</div>
+                                    <div class="rpm-unit">RPM</div>
+                                </div>
+                            </div>
+
+                            <!-- Safety Disclaimer -->
+                            <p class="motor-safety-disclaimer">⚠️ Manual motor testing via browser is disabled for
+                                safety. Use your radio to test live RPM.</p>
+                        </div>
+                        <div id="view-osd" class="tab-view">
+                            <!-- System Select Overlay -->
+                            <div id="osdSystemSelect" class="osd-system-select">
+                                <h2 class="tab-title">Select Your Video System</h2>
+                                <div class="osd-system-cards">
+                                    <div class="osd-sys-card" data-system="analog">
+                                        <div class="osd-sys-icon">📡</div>
+                                        <h3>Analog Video</h3>
+                                        <p>TBS Unify, Foxeer, Standard 5.8GHz</p>
+                                        <span class="osd-sys-grid">30 × 16 Grid</span>
+                                    </div>
+                                    <div class="osd-sys-card" data-system="hd">
+                                        <div class="osd-sys-icon">🎬</div>
+                                        <h3>HD Digital</h3>
+                                        <p>DJI O3, Walksnail Avatar, HDZero</p>
+                                        <span class="osd-sys-grid">50 × 18 Grid</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Main OSD Editor (hidden until system selected) -->
+                            <div id="osdEditor" class="osd-editor hidden">
+                                <!-- Template Buttons -->
+                                <div class="osd-templates">
+                                    <button class="osd-template-btn" data-template="freestyle">🎯 Freestyle</button>
+                                    <button class="osd-template-btn" data-template="racing">🏁 Racing</button>
+                                    <button class="osd-template-btn" data-template="longrange">🛰️ Long Range /
+                                        GPS</button>
+                                </div>
+
+                                <!-- OSD Canvas -->
+                                <div id="osdCanvas" class="osd-canvas">
+                                    <!-- OSD elements rendered here by osdEditor.js -->
+                                </div>
+
+                                <!-- Pending Changes Bar -->
+                                <div id="osdPendingBar" class="osd-pending-bar hidden">
+                                    <span id="osdPendingCount">0 pending changes</span>
+                                    <button id="osdReviewBtn" class="btn-primary">Review & Save Changes</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="view-vtx" class="tab-view">
+                            <h2 class="tab-title">Video Transmitter</h2>
+                            <p class="tab-placeholder">VTX band, channel, and power settings coming soon...</p>
+                        </div>
+
+                    </div> <!-- End Dashboard Views -->
+                </div> <!-- End Dashboard Layout -->
+
+                <!-- Sync Overlay -->
+                <div id="syncOverlay" class="sync-overlay hidden">
+                    <div class="sync-spinner"></div>
+                    <p>Syncing AI Context...</p>
+                </div>
+
+                <!-- Hidden E-Stop for future QA requirements -->
+                <button id="emergencyStopBtn" class="btn-danger hidden">EMERGENCY STOP</button>
+            </div>
+        </main>
+
+        <!-- Right Panel: AI Copilot -->
+        <aside class="panel copilot-panel">
+            <header class="panel-header">
+                <h2>AI Copilot</h2>
+                <div class="status-badge ai-status">Offline (Phase 1)</div>
+            </header>
+
+            <div class="chat-container" id="chatContainer">
+                <div class="message ai-message">
+                    <p>Hello! I am your Betaflight AI Copilot.</p>
+                    <p>Before we can chat, please connect to your flight controller using the button on the left.</p>
+                </div>
+            </div>
+
+            <!-- Chat Input Area -->
+            <div class="chat-input-area">
+                <textarea id="chatInput" placeholder="Ask Copilot a question..." disabled></textarea>
+                <button id="sendBtn" class="btn-send" disabled>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
+                    </svg>
+                </button>
+            </div>
+            <div id="thinkingIndicator" class="thinking-indicator hidden">AI is thinking...</div>
+
+            <!-- Developer Log Output (For Phase 1 Verification) -->
+            <div class="dev-console">
+                <div class="console-header">System Logs (Phase 1)</div>
+                <div id="logOutput" class="console-output"></div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Settings</h3>
+                <button id="closeSettingsBtn" class="btn-icon">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="setting-row" style="flex-direction: column; align-items: stretch; gap: 8px;">
+                    <span class="setting-label">Gemini API Key</span>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="password" id="apiKeyInput" class="input-field"
+                            placeholder="Paste your Gemini API key here..."
+                            style="flex: 1; background: var(--bg-main); border: 1px solid var(--border-subtle); color: var(--text-primary); padding: 8px 12px; border-radius: 6px; font-size: 0.9rem;">
+                        <button id="saveApiKeyBtn" class="btn-primary" style="white-space: nowrap;">Save Key</button>
+                    </div>
+                    <small style="color: var(--text-muted); font-size: 0.75rem;">Stored in sessionStorage only — never
+                        sent anywhere except the Gemini API.</small>
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Enable Debug Logging</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="debugToggle" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Export debug log file</span>
+                    <button id="downloadLogBtn" class="btn-secondary">Download Debug Log</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden QA Test Output Container -->
+    <div id="qa-test-results" class="hidden" style="display:none;"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="logger.js"></script>
+    <script src="mspProtocol.js"></script>
+    <script src="cliParser.js"></script>
+    <script src="drone3DBuilder.js"></script>
+    <script src="osdEditor.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>

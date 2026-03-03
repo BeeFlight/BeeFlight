@@ -1,0 +1,194 @@
+:root {
+    /* Core Backgrounds */
+    --bg-app: #0f1115;       /* Deep space black */
+    --bg-panel: #1a1d24;     /* Slightly lighter for panel surfaces */
+    --bg-input: #232730;     /* Chat input */
+  
+    /* Typography */
+    --text-primary: #ededed; 
+    --text-muted: #8b949e;   
+  
+    /* Accents & Status Alerts */
+    --accent-blue: #3b82f6;  
+    --accent-blue-hover: #2563eb;
+    --accent-purple: #8b5cf6;
+    --status-success: #10b981; 
+    --status-warning: #f59e0b; 
+    --status-danger: #ef4444;  
+  
+    /* Borders & Dividers */
+    --border-subtle: #30363d;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background-color: var(--bg-app);
+    color: var(--text-primary);
+    height: 100vh;
+    overflow: hidden;
+}
+
+.app-container {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+}
+
+/* Panel Layouts */
+.panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.dashboard-panel {
+    flex: 1; /* Left/Center takes more space */
+    border-right: 1px solid var(--border-subtle);
+    background-color: var(--bg-app);
+}
+
+.copilot-panel {
+    flex: 0 0 400px; /* Fixed width for chat */
+    background-color: var(--bg-panel);
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+h1, h2 {
+    font-weight: 600;
+    font-size: 1.25rem;
+    letter-spacing: -0.025em;
+}
+
+/* Badges */
+.status-badge {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    background: var(--bg-input);
+    color: var(--text-muted);
+}
+.status-badge.connected {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--status-success);
+}
+
+/* Buttons */
+.btn-primary {
+    background-color: var(--accent-blue);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 16px 32px;
+    font-size: 1.125rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 44px; /* Touch target minimum */
+}
+
+.btn-primary:hover {
+    background-color: var(--accent-blue-hover);
+}
+
+.btn-primary:active {
+    transform: scale(0.98);
+}
+
+.btn-danger {
+    background-color: var(--status-danger);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 12px 24px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+/* Dashboard Content */
+.dashboard-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+}
+
+.connect-section {
+    text-align: center;
+}
+
+.help-text {
+    margin-top: 16px;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+}
+
+/* Chat & Console */
+.chat-container {
+    flex: 1;
+    padding: 24px;
+    overflow-y: auto;
+}
+
+.message {
+    background-color: var(--bg-input);
+    padding: 16px;
+    border-radius: 12px;
+    border-top-left-radius: 2px;
+    margin-bottom: 16px;
+    line-height: 1.5;
+    font-size: 0.95rem;
+}
+
+.dev-console {
+    height: 250px;
+    border-top: 1px solid var(--border-subtle);
+    display: flex;
+    flex-direction: column;
+}
+
+.console-header {
+    background-color: var(--bg-app);
+    padding: 8px 16px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.console-output {
+    flex: 1;
+    background-color: #000;
+    color: var(--status-success);
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.8rem;
+    padding: 12px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+/* Utilities */
+.hidden {
+    display: none !important;
+}

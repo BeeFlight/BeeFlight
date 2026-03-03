@@ -1,0 +1,15 @@
+{
+    "name": "betaflight-ai-webapp",
+    "version": "1.0.0",
+    "description": "Betaflight AI Configurator Web Interface",
+    "scripts": {
+        "start": "live-server --port=3000 --cors",
+        "serve": "http-server -p 3000 --cors"
+    },
+    "author": "Antigravity",
+    "license": "MIT",
+    "devDependencies": {
+        "http-server": "^14.1.1",
+        "live-server": "^1.2.2"
+    }
+}

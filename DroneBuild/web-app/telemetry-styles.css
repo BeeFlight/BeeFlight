@@ -1,0 +1,119 @@
+/* =========================================================
+   Live Telemetry Styles (Phase 3)
+   ========================================================= */
+
+/* Enhanced RC Visualizer for Receiver Tab */
+.rc-visualizer {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    background-color: var(--bg-panel);
+    padding: 24px;
+    border-radius: 12px;
+    border: 1px solid var(--border-subtle);
+}
+
+.rc-channel {
+    display: grid;
+    grid-template-columns: 100px 1fr 60px;
+    align-items: center;
+    gap: 16px;
+}
+
+.rc-label {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.rc-bar-wrapper {
+    height: 12px;
+    background-color: var(--bg-app);
+    border-radius: 6px;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--border-subtle);
+}
+
+/* Center marker for standard sticks */
+.rc-bar-wrapper::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background-color: rgba(255, 255, 255, 0.1);
+    z-index: 2;
+}
+
+.rc-bar-fill {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 0%;
+    /* Dynamic */
+    border-radius: 6px;
+    /* Removed transition for instataneous real-time feel per requirements */
+}
+
+.rc-bar-fill.map-axis {
+    background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+}
+
+.rc-bar-fill.map-throttle {
+    background: linear-gradient(90deg, var(--status-success), var(--status-warning));
+}
+
+.rc-bar-fill.map-aux {
+    background: var(--text-muted);
+}
+
+.rc-val {
+    text-align: right;
+    font-family: 'Courier New', monospace;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+/* Sync Overlay */
+.sync-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 17, 21, 0.88);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    z-index: 100;
+    color: var(--accent-purple);
+    font-weight: 600;
+    font-size: 1rem;
+    backdrop-filter: blur(4px);
+}
+
+.sync-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border-subtle);
+    border-top-color: var(--accent-purple);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Make dashboard-content position relative for overlay */
+.dashboard-content {
+    position: relative;
+}
