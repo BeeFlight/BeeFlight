@@ -66,6 +66,24 @@ body {
     border-bottom: 1px solid var(--border-subtle);
 }
 
+.app-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.app-logo {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+}
+
+.app-brand-small .app-logo-small {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+}
+
 h1, h2 {
     font-weight: 600;
     font-size: 1.25rem;

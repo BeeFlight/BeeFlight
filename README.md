@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="DroneBuild/web-app/logo.png" alt="Betaflight AI bee logo" width="180" />
+</p>
+
 # 🦅 Betaflight AI
 
 **The intelligent, conversational copilot for FPV drone configuration.**
