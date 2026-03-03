@@ -190,8 +190,140 @@
                             </div>
                         </div>
                         <div id="view-pids" class="tab-view">
-                            <h2 class="tab-title">PID Tuning</h2>
-                            <p class="tab-placeholder">Advanced PID configuration and filter profiles coming soon...</p>
+                            <h2 class="tab-title">PID Tuning &amp; Rates</h2>
+
+                            <div class="pid-layout">
+                                <!-- Top Bar: Active Profiles -->
+                                <div class="data-card card-wide pid-topbar">
+                                    <div class="card-body">
+                                        <div class="pid-profile-pill">
+                                            <span class="pid-label">PID Profile</span>
+                                            <span id="pidProfileValue" class="pid-value">—</span>
+                                        </div>
+                                        <div class="pid-profile-pill">
+                                            <span class="pid-label">Rate Profile</span>
+                                            <span id="rateProfileValue" class="pid-value">—</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Split Layout -->
+                                <div class="pid-grid">
+                                    <!-- Left: Rates & Feel -->
+                                    <div class="pid-column-left">
+                                        <div class="data-card">
+                                            <div class="card-header">Rates &amp; Stick Feel</div>
+                                            <div class="card-body">
+                                                <canvas id="ratesChart" height="200"></canvas>
+                                                <div class="pid-rates-table">
+                                                    <div class="pid-rates-header">
+                                                        <span>Axis</span>
+                                                        <span>RC Rate</span>
+                                                        <span>Super Rate</span>
+                                                        <span>Expo</span>
+                                                    </div>
+                                                    <div class="pid-rates-row">
+                                                        <span>Roll</span>
+                                                        <span id="pidRollRcRate">—</span>
+                                                        <span id="pidRollSuperRate">—</span>
+                                                        <span id="pidRollExpo">—</span>
+                                                    </div>
+                                                    <div class="pid-rates-row">
+                                                        <span>Pitch</span>
+                                                        <span id="pidPitchRcRate">—</span>
+                                                        <span id="pidPitchSuperRate">—</span>
+                                                        <span id="pidPitchExpo">—</span>
+                                                    </div>
+                                                    <div class="pid-rates-row">
+                                                        <span>Yaw</span>
+                                                        <span id="pidYawRcRate">—</span>
+                                                        <span id="pidYawSuperRate">—</span>
+                                                        <span id="pidYawExpo">—</span>
+                                                    </div>
+                                                </div>
+
+                                                <div class="pid-templates">
+                                                    <button class="pid-template-btn" data-template="cinematic">🎥 Cinematic Feel</button>
+                                                    <button class="pid-template-btn" data-template="race">🏎️ Race Feel</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Right: PIDs & Symptoms -->
+                                    <div class="pid-column-right">
+                                        <div class="data-card">
+                                            <div class="card-header">PID Snapshot (Read-Only)</div>
+                                            <div class="card-body">
+                                                <div class="pid-table-wrapper">
+                                                    <table class="pid-table">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>Axis</th>
+                                                                <th>P</th>
+                                                                <th>I</th>
+                                                                <th>D</th>
+                                                                <th>F</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            <tr>
+                                                                <td>Roll</td>
+                                                                <td id="pidRollP">—</td>
+                                                                <td id="pidRollI">—</td>
+                                                                <td id="pidRollD">—</td>
+                                                                <td id="pidRollF">—</td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td>Pitch</td>
+                                                                <td id="pidPitchP">—</td>
+                                                                <td id="pidPitchI">—</td>
+                                                                <td id="pidPitchD">—</td>
+                                                                <td id="pidPitchF">—</td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td>Yaw</td>
+                                                                <td id="pidYawP">—</td>
+                                                                <td id="pidYawI">—</td>
+                                                                <td id="pidYawD">—</td>
+                                                                <td id="pidYawF">—</td>
+                                                            </tr>
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="data-card pid-diagnostic-card">
+                                            <div class="card-header">Diagnostic Assistant</div>
+                                            <div class="card-body">
+                                                <p class="pid-diagnostic-copy">
+                                                    Pick the symptom that most closely matches what your quad is doing.
+                                                    The Copilot will suggest safe, incremental changes.
+                                                </p>
+                                                <div class="symptom-badges">
+                                                    <button class="symptom-badge"
+                                                        data-symptom-prompt="My motors are coming down too hot after a flight. Please suggest safe D-term or filter changes based on my current PIDs and filters.">
+                                                        🔥 Hot Motors
+                                                    </button>
+                                                    <button class="symptom-badge"
+                                                        data-symptom-prompt="My drone has bad propwash shakes on descent. Please suggest D-term or filter changes to clean up propwash while staying safe for the motors.">
+                                                        〰️ Shakes on Descent (Propwash)
+                                                    </button>
+                                                    <button class="symptom-badge"
+                                                        data-symptom-prompt="My quad bounces or rebounds after flips and quick moves. Please suggest PID tuning changes to reduce bounce-back.">
+                                                        🪀 Bounces after Flips
+                                                    </button>
+                                                    <button class="symptom-badge"
+                                                        data-symptom-prompt="My drone feels sluggish and unresponsive. Please suggest PID and rate changes for a more responsive feel.">
+                                                        🐌 Feels Sluggish
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- RECEIVER TAB -->
@@ -401,8 +533,70 @@
                         </div>
                         <div id="view-vtx" class="tab-view">
                             <h2 class="tab-title">Video Transmitter</h2>
-                            <p class="tab-placeholder">VTX band, channel, and power settings coming soon...</p>
+                            <div class="vtx-layout">
+                                <!-- Top: System Type / Protocol Badge -->
+                                <div class="data-card card-wide vtx-protocol-card">
+                                    <div class="card-header">Video System</div>
+                                    <div class="card-body">
+                                        <div id="vtxProtocolBadge" class="vtx-protocol-badge">
+                                            📡 VTX Protocol: Detecting...
+                                        </div>
+                                        <p id="vtxProtocolDescription" class="vtx-protocol-description">
+                                            Waiting for CLI sync to detect your video system.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- Middle: Current Settings -->
+                                <div class="vtx-grid">
+                                    <div class="data-card vtx-card">
+                                        <div class="card-header">Band</div>
+                                        <div class="card-body">
+                                            <div id="vtxBandValue" class="vtx-value">—</div>
+                                            <div class="vtx-subtext">Value from Betaflight CLI</div>
+                                            <div id="vtxBandHdNote" class="vtx-hd-note hidden">
+                                                Band and Channel are managed directly through your HD Goggles, not
+                                                Betaflight.
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="data-card vtx-card">
+                                        <div class="card-header">Channel</div>
+                                        <div class="card-body">
+                                            <div id="vtxChannelValue" class="vtx-value">—</div>
+                                            <div class="vtx-subtext">Value from Betaflight CLI</div>
+                                            <div id="vtxChannelHdNote" class="vtx-hd-note hidden">
+                                                Band and Channel are managed directly through your HD Goggles, not
+                                                Betaflight.
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="data-card vtx-card">
+                                        <div class="card-header">Power Level</div>
+                                        <div class="card-body">
+                                            <div id="vtxPowerValue" class="vtx-value">—</div>
+                                            <div class="vtx-subtext">Value from Betaflight CLI</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Bottom: AI Helper Prompt -->
+                                <div class="data-card card-wide ai-hook-card vtx-ai-helper">
+                                    <div class="card-header">Race-Ready Channel Helper</div>
+                                    <div class="card-body">
+                                        <p>
+                                            Need to change your channel at a race? Tell the Copilot:
+                                        </p>
+                                        <blockquote class="vtx-quote">
+                                            "Put me on Raceband 8 at 25mW".
+                                        </blockquote>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
+
+                        <!-- Legacy hook for agents/QA expecting a tabVTX container -->
+                        <div id="tabVTX" class="tab-pane hidden"></div>
 
                     </div> <!-- End Dashboard Views -->
                 </div> <!-- End Dashboard Layout -->

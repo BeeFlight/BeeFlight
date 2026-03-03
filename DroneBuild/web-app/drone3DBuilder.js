@@ -17,8 +17,21 @@ const Drone3D = {
      * @param {Object} motorConfig - Parsed motor config from cliParser
      */
     init(container, motorConfig) {
-        if (!container || typeof THREE === 'undefined') {
-            console.warn('Three.js or container not available for 3D visualizer.');
+        if (!container) {
+            console.warn('No container provided for 3D visualizer.');
+            return;
+        }
+        if (typeof THREE === 'undefined') {
+            console.warn('Three.js not available for 3D visualizer.');
+            // Graceful fallback: show a simple placeholder message instead of a blank area
+            const msg = document.createElement('div');
+            msg.textContent = '3D motor visualizer unavailable (Three.js failed to load).';
+            msg.style.padding = '16px';
+            msg.style.textAlign = 'center';
+            msg.style.color = '#9CA3AF';
+            msg.style.fontSize = '0.9rem';
+            container.innerHTML = '';
+            container.appendChild(msg);
             return;
         }
 

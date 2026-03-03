@@ -771,3 +771,94 @@
     color: var(--accent-purple);
     font-weight: 600;
 }
+
+/* =========================================================
+   VTX TAB (Video Transmitter)
+   ========================================================= */
+.vtx-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.vtx-protocol-card .card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.vtx-protocol-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    background: rgba(59, 130, 246, 0.12);
+    border: 1px solid rgba(59, 130, 246, 0.4);
+    color: var(--accent-blue);
+}
+
+.vtx-protocol-badge.vtx-protocol-hd {
+    background: rgba(16, 185, 129, 0.12);
+    border-color: rgba(16, 185, 129, 0.5);
+    color: var(--status-success);
+}
+
+.vtx-protocol-badge.vtx-protocol-analog {
+    background: rgba(244, 63, 94, 0.12);
+    border-color: rgba(244, 63, 94, 0.5);
+    color: var(--status-error);
+}
+
+.vtx-protocol-description {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.vtx-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.vtx-card .card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.vtx-value {
+    font-family: 'Inter', sans-serif;
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.vtx-subtext {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.vtx-hd-note {
+    margin-top: 4px;
+    font-size: 0.8rem;
+    color: var(--accent-purple);
+}
+
+.vtx-ai-helper .card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.vtx-quote {
+    border-left: 3px solid var(--accent);
+    padding-left: 10px;
+    color: var(--text-secondary);
+    margin: 0;
+    font-style: italic;
+}

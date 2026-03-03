@@ -314,6 +314,239 @@ class CliParser {
 
         return config;
     }
+
+    /**
+     * Parses the raw `diff all` text and extracts PID, rate, and filter dynamics.
+     *
+     * @param {string} cliText The raw output of `diff all`
+     * @returns {Object|null} Object containing dynamics properties
+     */
+    static parseDynamics(cliText) {
+        if (!cliText) return null;
+
+        const dynamics = {
+            profile: 0,
+            rateProfile: 0,
+            pids: {
+                roll: { p: null, i: null, d: null, f: null },
+                pitch: { p: null, i: null, d: null, f: null },
+                yaw: { p: null, i: null, d: null, f: null }
+            },
+            rates: {
+                roll: { rcRate: null, superRate: null, expo: null },
+                pitch: { rcRate: null, superRate: null, expo: null },
+                yaw: { rcRate: null, superRate: null, expo: null }
+            },
+            filters: {
+                gyroLowpassHz: null,
+                dtermLowpassHz: null
+            }
+        };
+
+        const lines = cliText.split('\n');
+
+        lines.forEach(rawLine => {
+            const line = rawLine.trim();
+            if (!line.startsWith('set')) return;
+
+            const parts = line.split('=');
+            if (parts.length !== 2) return;
+            const key = parts[0].replace('set', '').trim();
+            const valStr = parts[1].trim();
+            const valNum = parseFloat(valStr);
+            const val = Number.isNaN(valNum) ? valStr : valNum;
+
+            switch (key) {
+                case 'profile':
+                    if (!Number.isNaN(valNum)) dynamics.profile = valNum;
+                    break;
+                case 'rateprofile':
+                    if (!Number.isNaN(valNum)) dynamics.rateProfile = valNum;
+                    break;
+                // PIDs
+                case 'p_roll':
+                    dynamics.pids.roll.p = val;
+                    break;
+                case 'i_roll':
+                    dynamics.pids.roll.i = val;
+                    break;
+                case 'd_roll':
+                    dynamics.pids.roll.d = val;
+                    break;
+                case 'f_roll':
+                    dynamics.pids.roll.f = val;
+                    break;
+                case 'p_pitch':
+                    dynamics.pids.pitch.p = val;
+                    break;
+                case 'i_pitch':
+                    dynamics.pids.pitch.i = val;
+                    break;
+                case 'd_pitch':
+                    dynamics.pids.pitch.d = val;
+                    break;
+                case 'f_pitch':
+                    dynamics.pids.pitch.f = val;
+                    break;
+                case 'p_yaw':
+                    dynamics.pids.yaw.p = val;
+                    break;
+                case 'i_yaw':
+                    dynamics.pids.yaw.i = val;
+                    break;
+                case 'd_yaw':
+                    dynamics.pids.yaw.d = val;
+                    break;
+                case 'f_yaw':
+                    dynamics.pids.yaw.f = val;
+                    break;
+                // Rates (RC rate, super rate, expo)
+                case 'roll_rc_rate':
+                    dynamics.rates.roll.rcRate = val;
+                    break;
+                case 'roll_srate':
+                    dynamics.rates.roll.superRate = val;
+                    break;
+                case 'roll_expo':
+                    dynamics.rates.roll.expo = val;
+                    break;
+                case 'pitch_rc_rate':
+                    dynamics.rates.pitch.rcRate = val;
+                    break;
+                case 'pitch_srate':
+                    dynamics.rates.pitch.superRate = val;
+                    break;
+                case 'pitch_expo':
+                    dynamics.rates.pitch.expo = val;
+                    break;
+                case 'yaw_rc_rate':
+                    dynamics.rates.yaw.rcRate = val;
+                    break;
+                case 'yaw_srate':
+                    dynamics.rates.yaw.superRate = val;
+                    break;
+                case 'yaw_expo':
+                    dynamics.rates.yaw.expo = val;
+                    break;
+                // Filters
+                case 'gyro_lowpass_hz':
+                    dynamics.filters.gyroLowpassHz = val;
+                    break;
+                case 'dterm_lowpass_hz':
+                    dynamics.filters.dtermLowpassHz = val;
+                    break;
+                default:
+                    break;
+            }
+        });
+
+        return dynamics;
+    }
+
+    /**
+     * Parses the raw `diff all` text and extracts VTX and displayport configuration.
+     * Also infers whether the system is running Analog VTX control or HD Digital (MSP DisplayPort).
+     *
+     * @param {string} cliText The raw output of `diff all`
+     * @returns {Object|null} Object containing VTX config and inferred system type
+     */
+    static parseVtxConfig(cliText) {
+        if (!cliText) return null;
+
+        const config = {
+            band: null,
+            channel: null,
+            power: null,
+            lowPowerDisarm: null,
+            osdDisplayportDevice: null,
+            // Detection flags
+            isHdDigital: false,
+            hasAnalogVtxOnSerial: false,
+            // Human-readable summary
+            systemType: 'Unknown',
+            protocolLabel: 'Unknown / Not Detected'
+        };
+
+        const lines = cliText.split('\n');
+
+        lines.forEach(line => {
+            const cleanLine = line.trim();
+
+            if (cleanLine.startsWith('set vtx_band')) {
+                const parts = cleanLine.split('=');
+                if (parts.length === 2) {
+                    const raw = parts[1].trim();
+                    const intVal = parseInt(raw, 10);
+                    config.band = Number.isNaN(intVal) ? raw : intVal;
+                }
+            } else if (cleanLine.startsWith('set vtx_channel')) {
+                const parts = cleanLine.split('=');
+                if (parts.length === 2) {
+                    const raw = parts[1].trim();
+                    const intVal = parseInt(raw, 10);
+                    config.channel = Number.isNaN(intVal) ? raw : intVal;
+                }
+            } else if (cleanLine.startsWith('set vtx_power')) {
+                const parts = cleanLine.split('=');
+                if (parts.length === 2) {
+                    const raw = parts[1].trim();
+                    const intVal = parseInt(raw, 10);
+                    config.power = Number.isNaN(intVal) ? raw : intVal;
+                }
+            } else if (cleanLine.startsWith('set vtx_low_power_disarm')) {
+                const parts = cleanLine.split('=');
+                if (parts.length === 2) {
+                    config.lowPowerDisarm = parts[1].trim();
+                }
+            } else if (cleanLine.startsWith('set osd_displayport_device')) {
+                const parts = cleanLine.split('=');
+                if (parts.length === 2) {
+                    const raw = parts[1].trim();
+                    config.osdDisplayportDevice = raw;
+                }
+            }
+        });
+
+        // Determine HD Digital vs Analog based on osd_displayport_device
+        let hdDigital = false;
+        if (config.osdDisplayportDevice !== null && config.osdDisplayportDevice !== undefined) {
+            const raw = String(config.osdDisplayportDevice).trim();
+            const intVal = parseInt(raw, 10);
+            if (!Number.isNaN(intVal)) {
+                // If osd_displayport_device is active (non-zero), treat as HD Digital
+                hdDigital = intVal !== PERIPHERAL_NONE;
+            } else {
+                const upper = raw.toUpperCase();
+                // Common Betaflight values: MSP, MAX7456, AT7456E, NONE
+                if (upper !== '0' && upper !== 'NONE' && upper !== 'OFF' && upper !== 'DISABLED') {
+                    hdDigital = true;
+                }
+            }
+        }
+        config.isHdDigital = hdDigital;
+
+        // If not HD Digital, look for SmartAudio / Tramp on any serial port function mask
+        if (!config.isHdDigital) {
+            const ports = CliParser.parsePorts(cliText) || [];
+            config.hasAnalogVtxOnSerial = ports.some(p =>
+                (p.functionMask & FUNCTION_VTX_SMARTAUDIO) || (p.functionMask & FUNCTION_VTX_TRAMP)
+            );
+        }
+
+        // Human-readable labels
+        if (config.isHdDigital) {
+            config.systemType = 'HD Digital';
+            config.protocolLabel = 'MSP DisplayPort (HD)';
+        } else if (config.hasAnalogVtxOnSerial) {
+            config.systemType = 'Analog';
+            config.protocolLabel = 'SmartAudio / IRC Tramp';
+        } else {
+            config.systemType = 'Unknown';
+            config.protocolLabel = 'Unknown / No VTX Detected';
+        }
+
+        return config;
+    }
 }
 
 // Export for browser

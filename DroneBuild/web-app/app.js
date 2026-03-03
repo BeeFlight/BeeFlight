@@ -32,6 +32,35 @@ const droneState = {
         analog: { voltage: 0, amperage: 0, mAhDrawn: 0, rssi: 0 },
         rpm: [0, 0, 0, 0]
     },
+    // Parsed static configuration derived from CLI diff
+    vtx: {
+        band: null,
+        channel: null,
+        power: null,
+        lowPowerDisarm: null,
+        osdDisplayportDevice: null,
+        systemType: 'Unknown',
+        protocolLabel: 'Unknown / Not Detected',
+        isHdDigital: false
+    },
+    dynamics: {
+        profile: 0,
+        rateProfile: 0,
+        pids: {
+            roll: { p: null, i: null, d: null, f: null },
+            pitch: { p: null, i: null, d: null, f: null },
+            yaw: { p: null, i: null, d: null, f: null }
+        },
+        rates: {
+            roll: { rcRate: null, superRate: null, expo: null },
+            pitch: { rcRate: null, superRate: null, expo: null },
+            yaw: { rcRate: null, superRate: null, expo: null }
+        },
+        filters: {
+            gyroLowpassHz: null,
+            dtermLowpassHz: null
+        }
+    },
     cliDiff: "" // Raw text from `diff all`
 };
 
@@ -273,7 +302,8 @@ ${droneState.cliDiff || '(Not yet synced — CLI diff has not been captured yet.
 - If the CLI diff is not yet available, tell the user you can still help based on live telemetry but recommend they sync context first.
 - BLACKBOX INTENTS: If the user selects 'Filter & Noise Diagnostics', generate CLI commands: \`set debug_mode = GYRO_SCALED\` and \`set blackbox_sample_rate = 1/1\`. If they select 'General Flight & PIDs', generate: \`set debug_mode = NONE\`. If they select 'Disable Logging', generate: \`set blackbox_device = NONE\`. Always remind them to erase their flash memory before a tuning flight.
 - MOTOR DIAGNOSTICS: If a user asks why their drone flips instantly on takeoff, check their yaw_motors_reversed and mixer settings in the CLI dump. Explain that their physical props, physical motor spin direction, and the software yaw_motors_reversed toggle must all match exactly. Tell them to look at the 3D Motors visualizer tab to verify.
-- OSD TEMPLATES: If the user clicks an OSD template button, generate the CLI block to enable the relevant osd_..._pos elements based on their selected video system (Analog 30x16 vs HD 50x18). If they ask you for help aligning items (e.g. 'put my timer right below my voltage'), use their current droneState.cliDiff to find the voltage coordinates, calculate the row directly beneath it, and output the new CLI command with the correct position integer.`;
+- OSD TEMPLATES: If the user clicks an OSD template button, generate the CLI block to enable the relevant osd_..._pos elements based on their selected video system (Analog 30x16 vs HD 50x18). If they ask you for help aligning items (e.g. 'put my timer right below my voltage'), use their current droneState.cliDiff to find the voltage coordinates, calculate the row directly beneath it, and output the new CLI command with the correct position integer.
+- VTX CONFIGURATION: If the user asks to change their VTX channel, band, or power, output the exact \`set vtx_band\`, \`set vtx_channel\`, and \`set vtx_power\` CLI commands they need, in a markdown code block. Before suggesting these commands, inspect the CLI diff for signs of an HD Digital system (for example, \`osd_displayport_device\` using MSP DisplayPort or any non-zero/active HD device). If the dump indicates an HD Digital system, clearly explain that changing VTX channels or power via Betaflight CLI does not work on HD systems and that they must use their goggle menu instead.`;
 
     try {
         const resp = await fetch(
@@ -643,6 +673,7 @@ async function initializeDrone() {
         renderPortsTab();
         renderModesTab();
         renderPowerTab();
+        renderVtxTab();
         renderBlackboxTab();
         renderMotorsTab();
         renderOsdTab();
@@ -1085,8 +1116,21 @@ async function triggerMassStorage() {
 // Motors Tab Rendering
 // ---------------------------------------------------------
 function renderMotorsTab() {
-    const mcfg = window.CliParser.parseMotorConfig(droneState.cliDiff);
-    if (!mcfg) return;
+    let mcfg = null;
+    if (droneState.cliDiff && window.CliParser) {
+        mcfg = window.CliParser.parseMotorConfig(droneState.cliDiff);
+    }
+
+    // Fallback to a sensible default configuration if CLI data is missing
+    if (!mcfg) {
+        mcfg = {
+            mixer: 'QUADX',
+            protocol: 'DSHOT300',
+            bidir: 'OFF',
+            motorPoles: 14,
+            yawReversed: 'OFF'
+        };
+    }
 
     // Populate config cards
     const protEl = document.getElementById('valEscProtocol');
@@ -1169,6 +1213,69 @@ function renderOsdTab() {
             window.OsdEditor.clearPending();
         });
     }
+}
+
+// ---------------------------------------------------------
+// VTX Tab Rendering
+// ---------------------------------------------------------
+function renderVtxTab() {
+    if (!window.CliParser || !droneState.cliDiff) return;
+
+    const cfg = window.CliParser.parseVtxConfig(droneState.cliDiff);
+    if (!cfg) return;
+
+    // Persist onto droneState for AI or future features
+    droneState.vtx = {
+        band: cfg.band,
+        channel: cfg.channel,
+        power: cfg.power,
+        lowPowerDisarm: cfg.lowPowerDisarm,
+        osdDisplayportDevice: cfg.osdDisplayportDevice,
+        systemType: cfg.systemType,
+        protocolLabel: cfg.protocolLabel,
+        isHdDigital: cfg.isHdDigital
+    };
+
+    const badge = document.getElementById('vtxProtocolBadge');
+    const desc = document.getElementById('vtxProtocolDescription');
+
+    if (badge) {
+        badge.textContent = `📡 VTX Protocol: ${cfg.protocolLabel}`;
+        badge.classList.remove('vtx-protocol-hd', 'vtx-protocol-analog');
+        if (cfg.isHdDigital) {
+            badge.classList.add('vtx-protocol-hd');
+        } else if (cfg.hasAnalogVtxOnSerial) {
+            badge.classList.add('vtx-protocol-analog');
+        }
+    }
+
+    if (desc) {
+        if (cfg.systemType === 'HD Digital') {
+            desc.textContent = 'Detected HD Digital video system via MSP DisplayPort.';
+        } else if (cfg.systemType === 'Analog') {
+            desc.textContent = 'Detected analog VTX using SmartAudio or IRC Tramp on a serial port.';
+        } else {
+            desc.textContent = 'Could not confidently detect your video system from the CLI dump.';
+        }
+    }
+
+    const bandEl = document.getElementById('vtxBandValue');
+    const chanEl = document.getElementById('vtxChannelValue');
+    const powerEl = document.getElementById('vtxPowerValue');
+
+    if (bandEl) bandEl.textContent = cfg.band !== null && cfg.band !== undefined ? String(cfg.band) : '—';
+    if (chanEl) chanEl.textContent = cfg.channel !== null && cfg.channel !== undefined ? String(cfg.channel) : '—';
+    if (powerEl) powerEl.textContent = cfg.power !== null && cfg.power !== undefined ? String(cfg.power) : '—';
+
+    const bandHdNote = document.getElementById('vtxBandHdNote');
+    const chanHdNote = document.getElementById('vtxChannelHdNote');
+    const showHdNotes = cfg.isHdDigital;
+
+    [bandHdNote, chanHdNote].forEach(el => {
+        if (!el) return;
+        if (showHdNotes) el.classList.remove('hidden');
+        else el.classList.add('hidden');
+    });
 }
 
 // ---------------------------------------------------------
