@@ -526,6 +526,147 @@
     color: var(--accent-purple);
 }
 
+/* ---- Blackbox Log Analyzer ---- */
+.blackbox-analyzer {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 16px;
+}
+
+.blackbox-dropzone {
+    border: 2px dashed var(--border-subtle);
+    border-radius: 12px;
+    padding: 32px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: rgba(139, 92, 246, 0.03);
+}
+
+.blackbox-dropzone:hover,
+.blackbox-dropzone.dragover {
+    border-color: var(--accent-purple);
+    background: rgba(139, 92, 246, 0.08);
+}
+
+.blackbox-dropzone .dropzone-text {
+    font-size: 1rem;
+    color: var(--text-primary);
+    margin: 0 0 8px;
+}
+
+.blackbox-dropzone .dropzone-hint {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin: 0;
+}
+
+.blackbox-dropzone .dropzone-hint a {
+    color: var(--accent-blue);
+    text-decoration: underline;
+}
+
+.blackbox-progress {
+    padding: 16px;
+    background: var(--bg-input);
+    border-radius: 10px;
+    border: 1px solid var(--border-subtle);
+}
+
+.progress-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.progress-step {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.progress-step.active {
+    color: var(--accent-purple);
+}
+
+.progress-step.done {
+    color: var(--status-success);
+}
+
+.progress-bar-track {
+    height: 6px;
+    background: var(--border-subtle);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background: var(--accent-purple);
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+.flight-report-card {
+    padding: 20px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+}
+
+.flight-report-card .report-header {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--text-primary);
+}
+
+.report-warnings {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.report-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.report-badge.danger {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--status-danger);
+}
+
+.report-badge.warning {
+    background: rgba(245, 158, 11, 0.15);
+    color: var(--status-warning);
+}
+
+.report-badge.info {
+    background: rgba(59, 130, 246, 0.15);
+    color: var(--accent-blue);
+}
+
+.report-metrics {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+    margin-bottom: 12px;
+}
+
+.report-copilot {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-subtle);
+}
+
 /* =========================================================
    MOTORS TAB (Phase 12)
    ========================================================= */

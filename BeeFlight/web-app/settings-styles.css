@@ -145,3 +145,74 @@
     background: var(--border-subtle);
     color: var(--text-primary);
 }
+
+/* ---- API Key Prompt Modal ---- */
+.api-key-modal-card {
+    max-width: 440px;
+}
+
+.api-key-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.api-key-modal-body .input-field {
+    background: var(--bg-input);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    width: 100%;
+}
+
+.api-key-helper {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.api-key-helper-steps {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+.api-key-helper-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 14px;
+    background: var(--accent-blue);
+    color: white;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background 0.2s;
+}
+
+.api-key-helper-link:hover {
+    background: var(--accent-blue-hover);
+}
+
+.api-key-security {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-top: 4px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-subtle);
+}
+
+.api-key-security-icon {
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+.api-key-security-text {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+}

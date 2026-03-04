@@ -230,10 +230,20 @@ h1, h2 {
 }
 
 .dev-console {
-    height: 250px;
     border-top: 1px solid var(--border-subtle);
     display: flex;
     flex-direction: column;
+    transition: height 0.25s ease;
+    height: 250px;
+    min-height: 32px;
+}
+
+.dev-console.collapsed {
+    height: 32px;
+}
+
+.dev-console.collapsed .console-output {
+    display: none;
 }
 
 .console-header {
@@ -244,6 +254,24 @@ h1, h2 {
     color: var(--text-muted);
     text-transform: uppercase;
     border-bottom: 1px solid var(--border-subtle);
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.console-header:hover {
+    color: var(--text-primary);
+}
+
+.console-chevron {
+    transition: transform 0.25s ease;
+}
+
+.dev-console.collapsed .console-chevron {
+    transform: rotate(-90deg);
 }
 
 .console-output {

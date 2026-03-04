@@ -428,10 +428,29 @@
                                 </div>
                             </div>
 
-                            <!-- AI Analyzer Dropzone -->
-                            <div class="ai-dropzone" id="bblDropzone">
-                                <p>Drop your <strong>.bbl</strong> log file here for AI Tuning Analysis (Coming Soon)
-                                </p>
+                            <!-- Blackbox Log Analyzer -->
+                            <div class="blackbox-analyzer">
+                                <div class="blackbox-dropzone" id="blackboxDropzone">
+                                    <input type="file" id="blackboxFileInput" accept=".bfl,.bbl,.csv" class="hidden">
+                                    <p class="dropzone-text">Drop your <strong>.bfl</strong> or <strong>.csv</strong> log file here</p>
+                                    <p class="dropzone-hint">Export CSV from <a href="https://blackbox.betaflight.com" target="_blank" rel="noopener">blackbox.betaflight.com</a> for full analysis</p>
+                                </div>
+                                <div id="blackboxProgress" class="blackbox-progress hidden">
+                                    <div class="progress-steps">
+                                        <span id="bbStep1" class="progress-step">1. Parsing Binary...</span>
+                                        <span id="bbStep2" class="progress-step">2. Running FFT Analysis...</span>
+                                        <span id="bbStep3" class="progress-step">3. Asking Copilot...</span>
+                                    </div>
+                                    <div class="progress-bar-track">
+                                        <div id="blackboxProgressBar" class="progress-bar-fill"></div>
+                                    </div>
+                                </div>
+                                <div id="blackboxReport" class="flight-report-card hidden">
+                                    <div class="report-header">Flight Report</div>
+                                    <div id="blackboxWarnings" class="report-warnings"></div>
+                                    <div id="blackboxMetrics" class="report-metrics"></div>
+                                    <div id="blackboxCopilotResponse" class="report-copilot"></div>
+                                </div>
                             </div>
                         </div>
                         <div id="view-motors" class="tab-view dashboard-cards">
@@ -648,7 +667,7 @@
                                                 Select a previously saved backup file to restore your configuration.
                                                 BeeFlight AI will run a safety checklist before flashing anything.
                                             </p>
-                                            <input type="file" id="importFileInput" accept=".txt" class="hidden">
+                                            <input type="file" id="importFileInput" accept=".txt,.bfai" class="hidden">
                                             <button id="btnSelectImportFile" class="backup-export-btn">
                                                 <span class="backup-icon">📁</span>
                                                 <span class="backup-label">Select Backup File</span>
@@ -725,12 +744,34 @@
 
         <!-- Right Panel: AI Copilot -->
         <aside class="panel copilot-panel">
-            <header class="panel-header">
-                <div class="app-brand app-brand-small">
-                    <img src="logo.png" alt="BeeFlight AI Logo" class="app-logo-small">
-                    <h2>AI Copilot</h2>
+            <header class="panel-header copilot-header">
+                <div class="copilot-header-top">
+                    <div class="app-brand app-brand-small">
+                        <img src="logo.png" alt="BeeFlight AI Logo" class="app-logo-small">
+                        <h2>AI Copilot</h2>
+                    </div>
+                    <div class="status-badge ai-status">Offline</div>
                 </div>
-                <div class="status-badge ai-status">Offline (Phase 1)</div>
+                <div class="copilot-header-model">
+                    <select id="aiModelSelector" class="model-selector">
+                        <optgroup label="Google">
+                            <option value="gemini-2.5-flash" selected>Gemini 2.5 Flash</option>
+                            <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                            <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                        </optgroup>
+                        <optgroup label="OpenAI">
+                            <option value="gpt-4o">GPT-4o</option>
+                            <option value="gpt-4o-mini">GPT-4o Mini</option>
+                        </optgroup>
+                        <optgroup label="Anthropic">
+                            <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
+                            <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku</option>
+                        </optgroup>
+                        <optgroup label="Groq (Free/Fast)">
+                            <option value="groq-llama3-70b">Llama 3 70B</option>
+                        </optgroup>
+                    </select>
+                </div>
             </header>
 
             <div class="chat-container" id="chatContainer">
@@ -752,8 +793,11 @@
             <div id="thinkingIndicator" class="thinking-indicator hidden">AI is thinking...</div>
 
             <!-- Developer Log Output (For Phase 1 Verification) -->
-            <div class="dev-console">
-                <div class="console-header">System Logs (Phase 1)</div>
+            <div class="dev-console" id="devConsole">
+                <div class="console-header" id="consoleToggle">
+                    <span>System Logs</span>
+                    <svg class="console-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </div>
                 <div id="logOutput" class="console-output"></div>
             </div>
         </aside>
@@ -788,6 +832,14 @@
                 <div class="setting-row">
                     <span class="setting-label">Export debug log file</span>
                     <button id="downloadLogBtn" class="btn-secondary">Download Debug Log</button>
+                </div>
+                <hr style="border-color: var(--border-subtle); opacity: 0.4; margin: 12px 0;">
+                <div class="setting-row" style="flex-direction: column; align-items: stretch; gap: 6px;">
+                    <span class="setting-label">AI Provider Keys</span>
+                    <small style="color: var(--text-muted); font-size: 0.75rem;">
+                        Saved API keys for AI providers (Google, OpenAI, Anthropic, Groq). Stored in localStorage only.
+                    </small>
+                    <button id="clearAiKeysBtn" class="btn-secondary" style="font-size: 0.8rem; align-self: flex-start; margin-top: 4px; color: var(--status-danger); border-color: var(--status-danger);">Clear All Saved AI Keys</button>
                 </div>
                 <hr style="border-color: var(--border-subtle); opacity: 0.4; margin: 12px 0;">
                 <div class="setting-row" style="flex-direction: column; align-items: stretch; gap: 6px;">
@@ -833,12 +885,37 @@
         </div>
     </div>
 
+    <!-- API Key Prompt Modal (shown when switching to a provider with no saved key) -->
+    <div id="apiKeyPromptModal" class="modal-overlay hidden">
+        <div class="modal-card api-key-modal-card">
+            <div class="modal-header">
+                <h3 id="apiKeyPromptTitle">Enter API Key</h3>
+                <button id="closeApiKeyPromptBtn" class="btn-icon">&times;</button>
+            </div>
+            <div class="modal-body api-key-modal-body">
+                <div id="apiKeyHelperContainer" class="api-key-helper">
+                    <p id="apiKeyHelperSteps" class="api-key-helper-steps"></p>
+                    <a id="apiKeyHelperLink" href="#" target="_blank" rel="noopener noreferrer" class="api-key-helper-link"></a>
+                </div>
+                <input type="password" id="providerKeyInput" class="input-field"
+                    placeholder="Paste your API key here...">
+                <button id="saveProviderKeyBtn" class="btn-primary" style="align-self: flex-end;">Save Key</button>
+                <div class="api-key-security">
+                    <span class="api-key-security-icon">🔒</span>
+                    <span id="apiKeySecurityText" class="api-key-security-text"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Hidden QA Test Output Container -->
     <div id="qa-test-results" class="hidden" style="display:none;"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.1/marked.min.js"></script>
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="logger.js"></script>
+    <script src="blackboxParser.js"></script>
     <script src="mspProtocol.js"></script>
     <script src="cliParser.js"></script>
     <script src="drone3DBuilder.js"></script>

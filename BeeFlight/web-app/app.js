@@ -3,19 +3,67 @@
 // Uses mspProtocol.js for encode/decode
 // =========================================================
 
-// ---- Gemini API Key (Secure: sessionStorage) ----
-function getApiKey() { return sessionStorage.getItem('gemini_api_key') || ''; }
-function setApiKey(key) { sessionStorage.setItem('gemini_api_key', key); }
-function promptForApiKey() {
-    const key = prompt('Enter your Google Gemini API Key:');
-    if (key && key.trim().length > 10) {
-        setApiKey(key.trim());
-        updateAiStatus();
-        logToConsole('Gemini API key saved for this session.', 'success');
-    } else if (key !== null) {
-        log.warn('Invalid API key entered.');
-        logToConsole('Invalid API key.', 'error');
+// ---- AI Provider Registry ----
+const AI_PROVIDERS = {
+    'gemini-2.5-flash':     { provider: 'google',    label: 'Gemini 2.5 Flash',   keySlot: 'bfai_key_google' },
+    'gemini-2.0-flash':     { provider: 'google',    label: 'Gemini 2.0 Flash',   keySlot: 'bfai_key_google' },
+    'gemini-2.5-pro':       { provider: 'google',    label: 'Gemini 2.5 Pro',     keySlot: 'bfai_key_google' },
+    'gpt-4o':               { provider: 'openai',    label: 'GPT-4o',             keySlot: 'bfai_key_openai' },
+    'gpt-4o-mini':          { provider: 'openai',    label: 'GPT-4o Mini',        keySlot: 'bfai_key_openai' },
+    'claude-sonnet-4-20250514':    { provider: 'anthropic', label: 'Claude Sonnet 4',  keySlot: 'bfai_key_anthropic' },
+    'claude-3-5-haiku-20241022':   { provider: 'anthropic', label: 'Claude 3.5 Haiku', keySlot: 'bfai_key_anthropic' },
+    'groq-llama3-70b':      { provider: 'groq',      label: 'Llama 3 70B (Groq)', keySlot: 'bfai_key_groq' }
+};
+
+const PROVIDER_LABELS = {
+    google: 'Google (Gemini)',
+    openai: 'OpenAI',
+    anthropic: 'Anthropic',
+    groq: 'Groq'
+};
+
+const API_INSTRUCTIONS = {
+    google: {
+        name: 'Google Gemini',
+        url: 'https://aistudio.google.com/app/apikey',
+        steps: 'Log in to Google AI Studio and click "Create API key".'
+    },
+    openai: {
+        name: 'OpenAI',
+        url: 'https://platform.openai.com/api-keys',
+        steps: 'Log in to the OpenAI Platform, navigate to API Keys, and click "Create new secret key".'
+    },
+    anthropic: {
+        name: 'Anthropic',
+        url: 'https://console.anthropic.com/settings/keys',
+        steps: 'Log in to the Anthropic Console, go to Settings, and click "Create Key".'
+    },
+    groq: {
+        name: 'Groq',
+        url: 'https://console.groq.com/keys',
+        steps: 'Log in to GroqCloud and click "Create API Key".'
     }
+};
+
+let activeModelId = 'gemini-2.5-flash';
+
+function getProviderKey(modelId) {
+    const entry = AI_PROVIDERS[modelId];
+    if (!entry) return '';
+    return localStorage.getItem(entry.keySlot) || '';
+}
+
+function setProviderKey(modelId, key) {
+    const entry = AI_PROVIDERS[modelId];
+    if (!entry) return;
+    localStorage.setItem(entry.keySlot, key || '');
+}
+
+// Legacy wrappers (still used by validation prompt and settings modal)
+function getApiKey() { return getProviderKey(activeModelId); }
+function setApiKey(key) { setProviderKey(activeModelId, key); }
+function promptForApiKey() {
+    switchAIModel(activeModelId);
 }
 
 // ---- Global Drone State ----
@@ -432,7 +480,11 @@ function stopUiUpdateLoop() {
 function appendChatMessage(role, text) {
     const d = document.createElement('div');
     d.classList.add('message', role === 'user' ? 'user-message' : 'ai-message');
-    d.textContent = text;
+    if (role === 'ai' && typeof marked !== 'undefined') {
+        d.innerHTML = marked.parse(text);
+    } else {
+        d.textContent = text;
+    }
     chatContainer.appendChild(d);
     chatContainer.scrollTop = chatContainer.scrollHeight;
 }
@@ -598,8 +650,8 @@ function renderAiResponse(rawText) {
 }
 
 function updateAiStatus() {
-    const key = getApiKey();
-    if (key && key.length > 10) {
+    const key = getProviderKey(activeModelId);
+    if (key && key.length > 5) {
         aiStatusBadge.textContent = "Online";
         aiStatusBadge.style.color = "var(--status-success)";
         aiStatusBadge.style.background = "rgba(16,185,129,0.1)";
@@ -612,10 +664,100 @@ function updateAiStatus() {
         aiStatusBadge.style.background = "rgba(245,158,11,0.1)";
         chatInput.disabled = true;
         sendBtn.disabled = true;
-        chatInput.placeholder = "Click the AI status badge to enter your API key";
+        chatInput.placeholder = "Select a model above and add an API key";
     }
 }
-aiStatusBadge.addEventListener('click', promptForApiKey);
+aiStatusBadge.addEventListener('click', () => switchAIModel(activeModelId));
+
+// ---- Multi-provider AI Request Router ----
+async function routeAiRequest(systemPrompt, userText) {
+    const entry = AI_PROVIDERS[activeModelId];
+    if (!entry) throw new Error('Unknown AI model selected.');
+    const key = getProviderKey(activeModelId);
+    if (!key) {
+        switchAIModel(activeModelId);
+        throw new Error('API key required. Please enter it in the popup.');
+    }
+
+    const provider = entry.provider;
+
+    if (provider === 'google') {
+        const resp = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${activeModelId}:generateContent?key=${key}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    systemInstruction: { parts: [{ text: systemPrompt }] },
+                    contents: [{ parts: [{ text: userText }] }]
+                })
+            }
+        );
+        if (!resp.ok) throw new Error(`Google API ${resp.status}`);
+        const data = await resp.json();
+        return data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    }
+
+    if (provider === 'openai') {
+        const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+            body: JSON.stringify({
+                model: activeModelId,
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userText }
+                ],
+                max_tokens: 2048
+            })
+        });
+        if (!resp.ok) throw new Error(`OpenAI API ${resp.status}`);
+        const data = await resp.json();
+        return data?.choices?.[0]?.message?.content || '';
+    }
+
+    if (provider === 'anthropic') {
+        const resp = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': key,
+                'anthropic-version': '2023-06-01',
+                'anthropic-dangerous-direct-browser-access': 'true'
+            },
+            body: JSON.stringify({
+                model: activeModelId,
+                max_tokens: 2048,
+                system: systemPrompt,
+                messages: [{ role: 'user', content: userText }]
+            })
+        });
+        if (!resp.ok) throw new Error(`Anthropic API ${resp.status}`);
+        const data = await resp.json();
+        return data?.content?.[0]?.text || '';
+    }
+
+    if (provider === 'groq') {
+        const groqModel = 'llama3-70b-8192';
+        const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+            body: JSON.stringify({
+                model: groqModel,
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userText }
+                ],
+                max_tokens: 2048
+            })
+        });
+        if (!resp.ok) throw new Error(`Groq API ${resp.status}`);
+        const data = await resp.json();
+        return data?.choices?.[0]?.message?.content || '';
+    }
+
+    throw new Error(`Unsupported provider: ${provider}`);
+}
 
 // ---------------------------------------------------------
 // AI Copilot — Gemini API (Overhauled System Prompt)
@@ -650,21 +792,25 @@ ${JSON.stringify(droneState.dynamics || {}, null, 2)}
 ${droneState.cliDiff || '(Not yet synced — CLI diff has not been captured yet.)'}
 \`\`\`
 
+## RESPONSE STYLE — MANDATORY
+- **Brevity is law.** Answer only the specific question asked in 1–3 short sentences. Never dump the entire drone state or config unless the user explicitly asks for it.
+- **Progressive disclosure.** Give the high-level answer first, then end with a one-line offer to go deeper (e.g. "Want me to break down the filter chain?").
+- **Formatting rules:** Use Markdown. Use **bold** for key values (firmware versions, protocol names, numbers). Use bullet lists sparingly (max 3–4 items). Never write a paragraph longer than 3 sentences. Use headings (###) only when listing multiple distinct topics.
+- **No filler.** Do not start responses with "Sure!", "Great question!", "Absolutely!", or similar. Get straight to the answer.
+
 ## RULES
-- Provide clear, concise, beginner-friendly answers.
-- Reference the live telemetry when discussing the drone's current state (armed, tilt, stick positions).
-- Reference the configuration diff when discussing settings (PIDs, filters, UARTs, VTX, OSD).
-- If the user asks to calibrate their voltage or amperage, use the provided CLI data to find their current scale. The formula for Betaflight voltage calibration is: New Scale = Old Scale * (Drone Reading / Multimeter Reading). Calculate the new scale, and generate the \`set vbat_scale = [NEW_VALUE]\` and \`save\` CLI commands for them.
+- Reference live telemetry for current state (armed, tilt, stick positions) and the configuration diff for settings (PIDs, filters, UARTs, VTX, OSD).
+- If the user asks to calibrate voltage or amperage, use CLI data to find the current scale. Formula: New Scale = Old Scale * (Drone Reading / Multimeter Reading). Generate the \`set vbat_scale = [NEW_VALUE]\` and \`save\` CLI commands.
 - NEVER generate commands that arm motors without explicit safety warnings.
-- If the CLI diff is not yet available, tell the user you can still help based on live telemetry but recommend they sync context first.
-- BLACKBOX INTENTS: If the user selects 'Filter & Noise Diagnostics', generate CLI commands as usual but wrap them in an action JSON (see below). If they select 'General Flight & PIDs', generate the appropriate CLI commands in an action JSON. If they select 'Disable Logging', generate the appropriate CLI commands in an action JSON. Always remind them to erase their flash memory before a tuning flight.
-- MOTOR DIAGNOSTICS: If a user asks why their drone flips instantly on takeoff, check their yaw_motors_reversed and mixer settings in the CLI dump. Explain that their physical props, physical motor spin direction, and the software yaw_motors_reversed toggle must all match exactly. Tell them to look at the 3D Motors visualizer tab to verify.
-- OSD TEMPLATES: If the user clicks an OSD template button, generate the CLI commands to enable the relevant osd_..._pos elements based on their selected video system (Analog 30x16 vs HD 50x18) as an action JSON (see below).
-- SYMPTOM-BASED TUNING: When the user describes tuning symptoms (e.g. hot motors, propwash on descent, bounce-back, sluggish feel), always base your advice on the parsed droneState.dynamics JSON.
-- HOT MOTORS: For hot motors, always suggest lowering d_pitch and d_roll by about 10–15% from their current values. Also inspect dterm_lowpass_hz; if it is very high (e.g. > 150Hz) recommend reducing it modestly to reduce heat. Never suggest *increasing* any D-term when the symptom is hot motors.
-- PROPWASH SHAKES: For propwash shakes on descent, suggest small increases to d_pitch and d_roll (within safe limits) and/or reducing filter delay (for example, modestly raising gyro_lowpass_hz or dterm_lowpass_hz within reasonable ranges), while still respecting the D-term safety rule below.
-- CINEMATIC RATES: For cinematic feel, propose changes to rc_rate and rc_expo so the center stick is softer but full-stick authority is preserved, and output these as CLI commands inside an action JSON (see below), not as raw CLI text.
-- SAFETY D-TERM LIMIT: Never increase any D-term value (d_roll, d_pitch, d_yaw) by more than 5 absolute points at a time. If the user's current D-term is already very high (e.g. above 50), recommend reductions instead of increases.
+- If the CLI diff is not yet available, tell the user you can help with live telemetry but recommend syncing context first.
+- BLACKBOX INTENTS: Generate CLI commands wrapped in an action JSON (see below) for filter diagnostics, general flight, or disable logging intents. Remind them to erase flash before a tuning flight.
+- MOTOR DIAGNOSTICS: For flip-on-takeoff, check yaw_motors_reversed and mixer. Explain that physical props, motor spin, and the software toggle must match. Point them to the 3D Motors visualizer tab.
+- OSD TEMPLATES: Generate osd_..._pos CLI commands based on video system (Analog 30x16 vs HD 50x18) as an action JSON.
+- SYMPTOM-BASED TUNING: Base advice on droneState.dynamics JSON.
+- HOT MOTORS: Suggest lowering d_pitch/d_roll by ~10–15%. If dterm_lowpass_hz > 150Hz, recommend reducing it. Never increase D-term for hot motors.
+- PROPWASH SHAKES: Suggest small d_pitch/d_roll increases (within limits) and/or reducing filter delay, respecting the D-term safety rule.
+- CINEMATIC RATES: Propose rc_rate/rc_expo changes for softer center stick, output as action JSON.
+- SAFETY D-TERM LIMIT: Never increase d_roll/d_pitch/d_yaw by more than 5 points at a time. If already above 50, recommend reductions.
 
 ## ACTION FORMAT
 When the user asks you to change a configuration setting (PIDs, rates, filters, VTX, Blackbox, OSD, etc.), you MUST respond with a structured JSON block wrapped in a fenced code block annotated as \`\`\`action (no other markdown). The JSON MUST have this shape:
@@ -676,21 +822,8 @@ When the user asks you to change a configuration setting (PIDs, rates, filters, 
 Do not include any additional fields. Do not wrap the JSON in markdown besides the single \`\`\`action fence. All CLI commands must be in the commands array only.`;
 
     try {
-        const resp = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    systemInstruction: { parts: [{ text: systemPrompt }] },
-                    contents: [{ parts: [{ text: userText }] }]
-                })
-            }
-        );
-        if (!resp.ok) throw new Error(`API ${resp.status}`);
-        const data = await resp.json();
-        const text = data.candidates[0].content.parts[0].text;
-        renderAiResponse(text);
+        const responseText = await routeAiRequest(systemPrompt, userText);
+        renderAiResponse(responseText);
     } catch (err) {
         log.error('Gemini API call failed', err);
         logToConsole(`Gemini Error: ${err.message}`, 'error');
@@ -743,7 +876,6 @@ function parseMspFrame(cmd, payload) {
         }
         case MSP.MSP_FC_VARIANT: {
             droneState.firmwareIdentifier = MSP.parseFcVariant(payload);
-            droneState.boardName = droneState.firmwareIdentifier;
             logToConsole(`FC Variant: ${droneState.firmwareIdentifier}`, 'success');
             break;
         }
@@ -940,6 +1072,27 @@ async function injectAIContext() {
         droneState.cliDump = droneState.cliDiff;
         logToConsole(`CLI diff captured (${droneState.cliDiff.length} chars)`, 'success');
 
+        // Best-effort board_name extraction from CLI for accurate hardware matching
+        try {
+            const lines = droneState.cliDiff.split(/\r?\n/);
+            for (const raw of lines) {
+                const line = String(raw).trim();
+                if (line.toLowerCase().startsWith('board_name')) {
+                    const parts = line.split(/\s+/);
+                    if (parts.length >= 2) {
+                        const bn = parts[1].trim();
+                        if (bn) {
+                            droneState.boardName = bn;
+                            logToConsole(`Board name detected from CLI: ${droneState.boardName}`, 'success');
+                        }
+                    }
+                    break;
+                }
+            }
+        } catch (e) {
+            log.error('Failed to parse board_name from CLI diff', e);
+        }
+
         // Exit CLI mode
         await cliWriter.write(encoder.encode('exit\n'));
         // Betaflight FC resets its serial interface after CLI exit.
@@ -1112,6 +1265,28 @@ async function captureCliDiff() {
         log.info(`CLI capture finished. Final length: ${droneState.cliDiff.length}`);
         logToConsole(`CLI diff captured (${droneState.cliDiff.length} chars)`, 'success');
 
+        // Best-effort board_name extraction from CLI for accurate hardware matching
+        try {
+            const cliLines = droneState.cliDiff.split(/\r?\n/);
+            for (const raw of cliLines) {
+                const line = String(raw).trim();
+                if (line.toLowerCase().startsWith('board_name')) {
+                    const parts = line.split(/\s+/);
+                    if (parts.length >= 2) {
+                        const bn = parts[1].trim();
+                        if (bn) {
+                            droneState.boardName = bn;
+                            log.info(`Board name detected from CLI: ${droneState.boardName}`);
+                            logToConsole(`Board name detected from CLI: ${droneState.boardName}`, 'success');
+                        }
+                    }
+                    break;
+                }
+            }
+        } catch (e) {
+            log.error('Failed to parse board_name from CLI diff', e);
+        }
+
         // CRITICAL: Exit CLI mode so FC returns to MSP mode before we close the port.
         // Without this, the FC stays in CLI and ignores all MSP commands on reopen.
         await cliWriter.write(encoder.encode('exit\n'));
@@ -1248,16 +1423,19 @@ settingsModal.addEventListener('click', (e) => {
     if (e.target === settingsModal) settingsModal.classList.add('hidden');
 });
 
-// API Key save
+// API Key save (legacy settings modal — saves to active provider)
 const saveApiKeyBtn = document.getElementById('saveApiKeyBtn');
 if (saveApiKeyBtn) {
     saveApiKeyBtn.addEventListener('click', () => {
         const apiInput = document.getElementById('apiKeyInput');
         if (apiInput && apiInput.value.trim()) {
-            setApiKey(apiInput.value.trim());
+            setProviderKey(activeModelId, apiInput.value.trim());
+            apiInput.value = '';
             updateAiStatus();
-            logToConsole('Gemini API key saved to sessionStorage.', 'success');
-            appendChatMessage('ai', 'API key saved! I\'m online now. Ask me anything about your drone.');
+            const entry = AI_PROVIDERS[activeModelId];
+            const label = entry ? entry.label : activeModelId;
+            logToConsole(`API key saved for ${label}.`, 'success');
+            appendChatMessage('ai', `API key saved for **${label}**! I'm online now.`);
         }
     });
 }
@@ -1304,6 +1482,8 @@ sidebarItems.forEach(item => {
         const viewId = item.getAttribute('data-view');
         const viewElement = document.getElementById(viewId);
         if (viewElement) viewElement.classList.add('active');
+
+        if (viewId === 'view-blackbox') renderBlackboxTab();
     });
 });
 
@@ -1347,20 +1527,73 @@ if (importFileInput) {
 
         const reader = new FileReader();
         reader.onload = async (ev) => {
-            const text = String(ev.target?.result || '');
-            importFileText = text;
+            const rawText = String(ev.target?.result || '');
 
-            const lines = text.split(/\r?\n/);
-            const headerSnippet = lines.slice(0, 60).join('\n');
+            const fileName = file.name || '';
+            const lowerName = fileName.toLowerCase();
+            const isBfai = lowerName.endsWith('.bfai');
+
+            let cliText = rawText;
+            let extraMeta = null;
+
+            if (isBfai) {
+                try {
+                    const parsed = JSON.parse(rawText);
+                    if (parsed && typeof parsed === 'object') {
+                        extraMeta = {
+                            format: parsed.format || null,
+                            version: parsed.version || null,
+                            createdAt: parsed.createdAt || null,
+                            board: parsed.board || null,
+                            stats: parsed.stats || null,
+                            meta: parsed.meta || null
+                        };
+                        if (parsed.cli && typeof parsed.cli === 'string') {
+                            cliText = parsed.cli;
+                        } else {
+                            throw new Error('BeeFlight backup file is missing cli field.');
+                        }
+                    } else {
+                        throw new Error('BeeFlight backup file is not valid JSON.');
+                    }
+                } catch (err) {
+                    logToConsole('Failed to parse .bfai backup file. Make sure it was exported by BeeFlight AI.', 'error');
+                    showToast('Failed to parse .bfai backup file.', 'error');
+                    resetImportUI();
+                    return;
+                }
+            }
+
+            importFileText = cliText;
+
+            const lines = cliText.split(/\r?\n/);
+            const headerLines = lines.slice(0, 120);
+            const headerSnippet = headerLines.join('\n');
             const tailSnippet = lines.slice(-10).join('\n');
+
+            // Try to locally detect motor protocol from the header snippet to avoid wasting AI tokens
+            let detectedMotorProtocol = null;
+            for (const raw of headerLines) {
+                const line = String(raw).trim();
+                const match = line.match(/^set\s+motor_pwm_protocol\s*=\s*(\S+)/i);
+                if (match) {
+                    detectedMotorProtocol = match[1];
+                    break;
+                }
+            }
 
             const context = {
                 headerSnippet,
                 tailSnippet,
-                liveBoard: droneState.boardName || droneState.firmwareIdentifier || 'Unknown',
+                liveBoard: droneState.boardName || 'Unknown',
+                liveFirmwareId: droneState.firmwareIdentifier || 'Unknown',
                 liveVersion: droneState.firmwareVersion || 'Unknown',
-                fileApproxLines: lines.length
+                fileApproxLines: lines.length,
+                motorProtocol: (extraMeta && extraMeta.meta && extraMeta.meta.motorProtocol) || detectedMotorProtocol || 'Unknown',
+                backupMeta: extraMeta
             };
+
+            log.info('Backup validation context', context);
 
             const result = await validateBackupWithAi(context);
             if (!result) {
@@ -1430,6 +1663,124 @@ if (btnFlashDrone) {
         if (importProgressContainer) importProgressContainer.classList.remove('hidden');
         updateImportProgress(0);
         restoreCliData(importFileText);
+    });
+}
+
+// ---- System Logs toggle (collapse/expand) ----
+const consoleToggle = document.getElementById('consoleToggle');
+const devConsole = document.getElementById('devConsole');
+if (consoleToggle && devConsole) {
+    const savedState = localStorage.getItem('bfai_console_collapsed');
+    if (savedState === 'true') devConsole.classList.add('collapsed');
+    consoleToggle.addEventListener('click', () => {
+        devConsole.classList.toggle('collapsed');
+        localStorage.setItem('bfai_console_collapsed', devConsole.classList.contains('collapsed'));
+    });
+}
+
+// ---- AI Model Selector & Key Interceptor ----
+const aiModelSelector = document.getElementById('aiModelSelector');
+const apiKeyPromptModal = document.getElementById('apiKeyPromptModal');
+const apiKeyPromptTitle = document.getElementById('apiKeyPromptTitle');
+const providerKeyInput = document.getElementById('providerKeyInput');
+const saveProviderKeyBtn = document.getElementById('saveProviderKeyBtn');
+const closeApiKeyPromptBtn = document.getElementById('closeApiKeyPromptBtn');
+const clearAiKeysBtn = document.getElementById('clearAiKeysBtn');
+
+let pendingSwitchModelId = null;
+
+function renderApiKeyModalContent(providerKey) {
+    const info = API_INSTRUCTIONS[providerKey];
+    const name = info ? info.name : providerKey;
+    const steps = info ? info.steps : 'Visit the provider dashboard to create an API key.';
+    const url = info ? info.url : '#';
+
+    if (apiKeyPromptTitle) apiKeyPromptTitle.textContent = `Enter your ${name} API Key`;
+    const stepsEl = document.getElementById('apiKeyHelperSteps');
+    if (stepsEl) stepsEl.textContent = `Don't have one? ${steps}`;
+    const linkEl = document.getElementById('apiKeyHelperLink');
+    if (linkEl) {
+        linkEl.href = url;
+        linkEl.textContent = `Get your ${name} key here ↗`;
+    }
+    const securityEl = document.getElementById('apiKeySecurityText');
+    if (securityEl) securityEl.textContent = `Your API key is stored securely in your browser's local storage and is never sent to our servers. You communicate directly with ${name}.`;
+}
+
+function switchAIModel(modelId) {
+    const entry = AI_PROVIDERS[modelId];
+    if (!entry) return;
+
+    const key = getProviderKey(modelId);
+    if (!key) {
+        pendingSwitchModelId = modelId;
+        renderApiKeyModalContent(entry.provider);
+        if (providerKeyInput) providerKeyInput.value = '';
+        if (apiKeyPromptModal) apiKeyPromptModal.classList.remove('hidden');
+        return;
+    }
+
+    activeModelId = modelId;
+    localStorage.setItem('bfai_active_model', modelId);
+    updateAiStatus();
+    appendChatMessage('ai', `Switched to **${entry.label}**.`);
+    log.info(`AI model switched to ${entry.label} (${modelId})`);
+}
+
+if (saveProviderKeyBtn) {
+    saveProviderKeyBtn.addEventListener('click', () => {
+        const val = providerKeyInput ? providerKeyInput.value.trim() : '';
+        if (!val || val.length < 5) {
+            showToast('Please enter a valid API key.', 'error');
+            return;
+        }
+        if (pendingSwitchModelId) {
+            setProviderKey(pendingSwitchModelId, val);
+        }
+        if (providerKeyInput) providerKeyInput.value = '';
+        if (apiKeyPromptModal) apiKeyPromptModal.classList.add('hidden');
+
+        if (pendingSwitchModelId) {
+            const entry = AI_PROVIDERS[pendingSwitchModelId];
+            activeModelId = pendingSwitchModelId;
+            localStorage.setItem('bfai_active_model', pendingSwitchModelId);
+            updateAiStatus();
+            appendChatMessage('ai', `Switched to **${entry.label}**.`);
+            log.info(`AI model switched to ${entry.label} (${pendingSwitchModelId})`);
+            pendingSwitchModelId = null;
+        }
+    });
+}
+
+if (closeApiKeyPromptBtn) {
+    closeApiKeyPromptBtn.addEventListener('click', () => {
+        if (providerKeyInput) providerKeyInput.value = '';
+        if (apiKeyPromptModal) apiKeyPromptModal.classList.add('hidden');
+        if (pendingSwitchModelId && aiModelSelector) {
+            aiModelSelector.value = activeModelId;
+        }
+        pendingSwitchModelId = null;
+    });
+}
+
+if (aiModelSelector) {
+    const savedModel = localStorage.getItem('bfai_active_model');
+    if (savedModel && AI_PROVIDERS[savedModel]) {
+        activeModelId = savedModel;
+        aiModelSelector.value = savedModel;
+    }
+    aiModelSelector.addEventListener('change', () => {
+        switchAIModel(aiModelSelector.value);
+    });
+}
+
+if (clearAiKeysBtn) {
+    clearAiKeysBtn.addEventListener('click', () => {
+        const slots = new Set(Object.values(AI_PROVIDERS).map(e => e.keySlot));
+        slots.forEach(slot => localStorage.removeItem(slot));
+        showToast('All saved AI provider keys have been cleared.', 'success');
+        log.info('All AI provider keys cleared from localStorage.');
+        updateAiStatus();
     });
 }
 
@@ -1539,32 +1890,86 @@ function renderPowerTab() {
 // ---------------------------------------------------------
 // Backup Tab — Export routing
 // ---------------------------------------------------------
-function buildBackupFileName() {
-    const boardName = droneState.firmwareIdentifier || 'Betaflight';
+function buildBackupBaseName() {
+    const boardName = droneState.boardName || droneState.firmwareIdentifier || 'Betaflight';
     const today = new Date();
     const yyyy = today.getFullYear();
     const mm = String(today.getMonth() + 1).padStart(2, '0');
     const dd = String(today.getDate()).padStart(2, '0');
-    return `Betaflight_Backup_${boardName}_${yyyy}-${mm}-${dd}.txt`;
+    return `Betaflight_Backup_${boardName}_${yyyy}-${mm}-${dd}`;
+}
+
+function buildBackupFileName() {
+    return `${buildBackupBaseName()}.txt`;
+}
+
+function buildBfaiBackupFileName() {
+    return `${buildBackupBaseName()}.bfai`;
 }
 
 function getBackupContent() {
     return droneState.cliDiff || '# No CLI diff captured yet.\n';
 }
 
-function exportLocalBackup() {
-    const fileName = buildBackupFileName();
-    const content = getBackupContent();
-    const blob = new Blob([content], { type: 'text/plain' });
+function getBfaiBackupContent() {
+    const cliText = getBackupContent();
+    const lines = cliText.split(/\r?\n/);
+
+    let motorProtocol = null;
+    for (const raw of lines) {
+        const line = String(raw).trim();
+        const match = line.match(/^set\s+motor_pwm_protocol\s*=\s*(\S+)/i);
+        if (match) {
+            motorProtocol = match[1];
+            break;
+        }
+    }
+
+    const payload = {
+        format: 'BeeFlightBackup',
+        version: 1,
+        createdAt: new Date().toISOString(),
+        source: 'BeeFlight AI',
+        board: {
+            name: droneState.boardName || null,
+            firmwareId: droneState.firmwareIdentifier || null,
+            firmwareVersion: droneState.firmwareVersion || null,
+            mspApiVersion: droneState.mspApiVersion || null
+        },
+        stats: {
+            lineCount: lines.length
+        },
+        meta: {
+            motorProtocol: motorProtocol || null
+        },
+        cli: cliText
+    };
+
+    return JSON.stringify(payload, null, 2);
+}
+
+function triggerDownload(name, content, mime = 'text/plain') {
+    const blob = new Blob([content], { type: mime });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = fileName;
+    a.download = name;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    showToast('Configuration downloaded as text file.', 'success');
+}
+
+function exportLocalBackup() {
+    const txtName = buildBackupFileName();
+    const txtContent = getBackupContent();
+    triggerDownload(txtName, txtContent, 'text/plain');
+
+    const bfaiName = buildBfaiBackupFileName();
+    const bfaiContent = getBfaiBackupContent();
+    triggerDownload(bfaiName, bfaiContent, 'application/json');
+
+    showToast('Configuration downloaded as .txt and .bfai backups.', 'success');
 }
 
 async function ensureGoogleDriveAuth() {
@@ -1694,34 +2099,43 @@ async function validateBackupWithAi(context) {
 
     const systemPrompt = `You are a Betaflight Safety Inspector. Compare the uploaded file snippet to the live drone state.
 You MUST return a strict JSON object with these keys:
-- hardwareMatch: boolean (does board_name match the live board?)
+- hardwareMatch: boolean (does the backup file's board_name match the live board_name?)
 - versionMatch: boolean (does the Betaflight major/minor version match the live firmware?)
 - fileIntegrity: boolean (does this look like a valid Betaflight dump, with headers and a terminating save command?)
 - motorSafety: boolean (is the configured motor protocol a DSHOT variant, indicating safe digital throttle signaling?)
 - reasoning: string (short explanation of any failures or risks).
 
-Rules:
+Additional context rules:
+- The JSON context may contain: headerSnippet, tailSnippet, liveBoard, liveFirmwareId, liveVersion, fileApproxLines, and motorProtocol.
+- liveBoard represents the current board_name of the connected flight controller. liveFirmwareId is a short identifier such as "BTFL" and must NOT be treated as a board name.
+- When checking hardwareMatch, compare the backup's board_name ONLY to liveBoard. If liveBoard is "Unknown", set hardwareMatch to false and explain the uncertainty.
+- When deciding motorSafety, if motorProtocol is one of: DSHOT150, DSHOT300, DSHOT600, DSHOT1200 (case-insensitive), treat motorSafety as true. If motorProtocol is missing or a non-DSHOT value, set motorSafety to false and explain why.
+
+General rules:
 - Output ONLY raw JSON, no markdown and no extra commentary.
 - If you are uncertain about any key, set it to false and explain why in the reasoning string.`;
 
     try {
-        const resp = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    systemInstruction: { parts: [{ text: systemPrompt }] },
-                    contents: [{ parts: [{ text: JSON.stringify(context) }] }]
-                })
-            }
-        );
-        if (!resp.ok) throw new Error(`API ${resp.status}`);
-        const data = await resp.json();
-        const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        let raw = await routeAiRequest(systemPrompt, JSON.stringify(context));
+        raw = (raw || '').trim();
         if (!raw) throw new Error('Empty validation response from AI');
+
+        // Be tolerant of markdown fences like ```json ... ``` around the JSON
+        if (raw.startsWith('```')) {
+            const firstNewline = raw.indexOf('\n');
+            if (firstNewline !== -1) {
+                raw = raw.slice(firstNewline + 1);
+            }
+            const lastFence = raw.lastIndexOf('```');
+            if (lastFence !== -1) {
+                raw = raw.slice(0, lastFence).trim();
+            }
+        }
+
         try {
-            return JSON.parse(raw);
+            const parsed = JSON.parse(raw);
+            log.info('Backup validation result', parsed);
+            return parsed;
         } catch (e) {
             log.error('Backup validation JSON parse error', raw);
             throw new Error('AI did not return valid JSON');
@@ -1938,47 +2352,180 @@ function renderPidTab() {
 // ---------------------------------------------------------
 // Blackbox Tab Rendering
 // ---------------------------------------------------------
+let blackboxDropzoneWired = false;
+
 function renderBlackboxTab() {
-    const bbcfg = window.CliParser.parseBlackboxConfig(droneState.cliDiff);
-    if (!bbcfg) return;
+    const bbcfg = window.CliParser ? window.CliParser.parseBlackboxConfig(droneState.cliDiff) : null;
 
     const deviceEl = document.getElementById('valBboxDevice');
     const rateEl = document.getElementById('valBboxRate');
-    if (deviceEl) deviceEl.textContent = bbcfg.device;
-    if (rateEl) rateEl.textContent = `${bbcfg.sampleRate} / ${bbcfg.debugMode}`;
+    if (deviceEl) deviceEl.textContent = bbcfg ? bbcfg.device : '—';
+    if (rateEl) rateEl.textContent = bbcfg ? `${bbcfg.sampleRate} / ${bbcfg.debugMode}` : '—';
 
     // Intent Card Click Handlers
     document.querySelectorAll('.intent-card').forEach(card => {
+        card.replaceWith(card.cloneNode(true));
+    });
+    document.querySelectorAll('.intent-card').forEach(card => {
         card.addEventListener('click', () => {
-            // Visual selection
             document.querySelectorAll('.intent-card').forEach(c => c.classList.remove('selected'));
             card.classList.add('selected');
-
             const intent = card.dataset.intent;
             let message = '';
-            if (intent === 'general') {
-                message = 'I want to set my Blackbox to General Flight & PID logging mode. Please give me the CLI commands.';
-            } else if (intent === 'filters') {
-                message = 'I want to set my Blackbox to Filter & Noise Diagnostics mode (GYRO_SCALED, max sample rate). Please give me the CLI commands.';
-            } else if (intent === 'disable') {
-                message = 'I want to disable Blackbox logging entirely to save storage. Please give me the CLI commands.';
-            }
+            if (intent === 'general') message = 'I want to set my Blackbox to General Flight & PID logging mode. Please give me the CLI commands.';
+            else if (intent === 'filters') message = 'I want to set my Blackbox to Filter & Noise Diagnostics mode (GYRO_SCALED, max sample rate). Please give me the CLI commands.';
+            else if (intent === 'disable') message = 'I want to disable Blackbox logging entirely to save storage. Please give me the CLI commands.';
             if (message) sendMessageToCopilot(message);
         });
     });
 
-    // Mount MSC button
-    const mscBtn = document.getElementById('btnMountMsc');
-    if (mscBtn) {
-        mscBtn.addEventListener('click', () => triggerMassStorage());
+    if (bbcfg) {
+        const mscBtn = document.getElementById('btnMountMsc');
+        if (mscBtn) mscBtn.onclick = () => triggerMassStorage();
+        const eraseBtn = document.getElementById('btnEraseFlash');
+        if (eraseBtn) eraseBtn.onclick = () => sendMessageToCopilot('I want to erase my Blackbox flash storage. Please give me the CLI command and warn me about data loss.');
     }
 
-    // Erase Flash button
-    const eraseBtn = document.getElementById('btnEraseFlash');
-    if (eraseBtn) {
-        eraseBtn.addEventListener('click', () => {
-            sendMessageToCopilot('I want to erase my Blackbox flash storage. Please give me the CLI command and warn me about data loss.');
+    // Blackbox Log Analyzer (wire once)
+    if (!blackboxDropzoneWired && window.BlackboxParser) {
+        wireBlackboxAnalyzer();
+        blackboxDropzoneWired = true;
+    }
+}
+
+async function analyzeBlackboxWithAI(summary) {
+    const apiKey = getProviderKey(activeModelId);
+    if (!apiKey) {
+        switchAIModel(activeModelId);
+        throw new Error('API key required for analysis.');
+    }
+
+    const systemPrompt = `You are an elite Blackbox Data Analyst. The user will provide a JSON summary of their flight log.
+
+## RULES
+- Look at peakResonances. If there is high noise below 150Hz, output an Action Card to lower their dynamic notch or lowpass filters (e.g. dyn_notch_count, gyro_lowpass_hz, dterm_lowpass_hz).
+- Look at motorAverages. If one motor is >15% higher than the rest, warn the user to check their hardware (propellers, bearings, motor screws) BEFORE changing any software tunes. Do not output an action card for hardware issues.
+- Look at pidTracking. If the error is high, suggest increasing P and I gains via an Action Card.
+- Output your tuning fixes using the \`\`\`action JSON format:
+{
+  "intent": "<short description>",
+  "summary": "<1-2 sentence explanation>",
+  "commands": ["set ...", "set ...", "save"]
+}
+- If no software changes are needed, respond with a brief text explanation only (no action block).
+- Be concise. Max 2-3 bullet points.`;
+
+    const responseText = await routeAiRequest(systemPrompt, JSON.stringify(summary, null, 2));
+    return responseText;
+}
+
+function renderBlackboxReport(summary, aiResponse) {
+    const warningsEl = document.getElementById('blackboxWarnings');
+    const metricsEl = document.getElementById('blackboxMetrics');
+    const copilotEl = document.getElementById('blackboxCopilotResponse');
+    const reportCard = document.getElementById('blackboxReport');
+
+    if (!warningsEl || !metricsEl || !copilotEl || !reportCard) return;
+
+    const badges = [];
+    const avg = summary.motorAverages.reduce((a, b) => a + b, 0) / 4 || 1;
+    summary.motorAverages.forEach((m, i) => {
+        if (m > avg * 1.15) badges.push({ type: 'danger', text: `High Motor ${i + 1} Load (${m.toFixed(0)}%)` });
+    });
+    (summary.peakResonances || []).forEach(f => {
+        if (f < 150 && f > 0) badges.push({ type: 'warning', text: `Frame Resonance at ${f}Hz` });
+    });
+    if (summary.pidTracking != null && summary.pidTracking > 50) {
+        badges.push({ type: 'warning', text: `High PID Tracking Error (${summary.pidTracking.toFixed(0)})` });
+    }
+
+    warningsEl.innerHTML = badges.map(b => `<span class="report-badge ${b.type}">${b.text}</span>`).join('') || '<span class="report-badge info">No critical issues detected</span>';
+
+    let metricsHtml = `Frames: ${summary.frameCount || 0}`;
+    if (summary.peakResonances && summary.peakResonances.length) metricsHtml += ` · Peak resonances: ${summary.peakResonances.join(', ')} Hz`;
+    if (summary.pidTracking != null) metricsHtml += ` · PID error: ${summary.pidTracking.toFixed(1)}`;
+    if (summary.motorAverages && summary.motorAverages.length) metricsHtml += ` · Motor avg: ${summary.motorAverages.map(m => m.toFixed(0)).join(', ')}%`;
+    metricsEl.textContent = metricsHtml;
+
+    copilotEl.innerHTML = '';
+    if (aiResponse && typeof marked !== 'undefined') {
+        copilotEl.innerHTML = marked.parse(aiResponse);
+    } else if (aiResponse) {
+        copilotEl.textContent = aiResponse;
+    }
+
+    reportCard.classList.remove('hidden');
+}
+
+function wireBlackboxAnalyzer() {
+    const dropzone = document.getElementById('blackboxDropzone');
+    const fileInput = document.getElementById('blackboxFileInput');
+    const progress = document.getElementById('blackboxProgress');
+    const progressBar = document.getElementById('blackboxProgressBar');
+    const step1 = document.getElementById('bbStep1');
+    const step2 = document.getElementById('bbStep2');
+    const step3 = document.getElementById('bbStep3');
+    const reportCard = document.getElementById('blackboxReport');
+
+    if (!dropzone || !fileInput || !window.BlackboxParser) return;
+
+    function setProgress(pct, activeStep) {
+        if (progressBar) progressBar.style.width = pct + '%';
+        [step1, step2, step3].forEach((el, i) => {
+            if (!el) return;
+            el.classList.remove('active', 'done');
+            if (i < activeStep) el.classList.add('done');
+            else if (i === activeStep) el.classList.add('active');
         });
+    }
+
+    function reset() {
+        if (progress) progress.classList.add('hidden');
+        if (reportCard) reportCard.classList.add('hidden');
+    }
+
+    dropzone.addEventListener('click', () => fileInput.click());
+    dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+    dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('dragover');
+        const file = e.dataTransfer?.files?.[0];
+        if (file) runAnalysis(file);
+    });
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files?.[0];
+        if (file) runAnalysis(file);
+        e.target.value = '';
+    });
+
+    async function runAnalysis(file) {
+        reset();
+        if (progress) progress.classList.remove('hidden');
+        setProgress(10, 0);
+
+        try {
+            const summary = await window.BlackboxParser.parseFile(file, (p) => setProgress(Math.min(60, p + 20), p < 40 ? 0 : 1));
+            if (!summary) throw new Error('Could not parse log.');
+            setProgress(70, 1);
+
+            if (summary.message) {
+                renderBlackboxReport(summary, summary.message);
+                setProgress(100, 2);
+                return;
+            }
+
+            setProgress(80, 2);
+            const aiResponse = await analyzeBlackboxWithAI(summary);
+            setProgress(100, 2);
+
+            renderBlackboxReport(summary, aiResponse);
+            renderAiResponse(aiResponse);
+        } catch (err) {
+            log.error('Blackbox analysis failed', err);
+            showToast(err.message || 'Blackbox analysis failed.', 'error');
+            reset();
+        }
     }
 }
 
