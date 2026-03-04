@@ -1345,3 +1345,306 @@
     border-color: var(--accent);
     background: rgba(0, 240, 255, 0.08);
 }
+
+/* =========================================================
+   Flight Report Dashboard (Phase 3)
+   ========================================================= */
+
+.report-dashboard {
+    margin-top: 20px;
+    animation: fadeIn 0.3s ease;
+}
+
+.report-dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.report-dashboard-header h3 {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.report-summary-text {
+    background: rgba(0, 240, 255, 0.05);
+    border-left: 3px solid var(--accent);
+    padding: 12px 16px;
+    border-radius: 0 8px 8px 0;
+    margin-bottom: 20px;
+    font-size: 0.92rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.report-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 20px;
+}
+
+@media (max-width: 600px) {
+    .report-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.report-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 16px;
+    transition: border-color 0.2s;
+}
+
+.report-card:hover {
+    border-color: var(--accent);
+}
+
+.report-card-icon {
+    font-size: 1.5rem;
+    margin-bottom: 6px;
+}
+
+.report-card-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+    margin-bottom: 10px;
+}
+
+.report-card-body {
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.stat-row:last-child {
+    border-bottom: none;
+}
+
+.stat-row span:last-child {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* Vibration Indicator */
+.vibe-indicator {
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.vibe-indicator.vibe-clean {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.vibe-indicator.vibe-moderate {
+    background: rgba(245, 158, 11, 0.1);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.vibe-indicator.vibe-severe {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.noise-axes,
+.tracking-axes {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+}
+
+.noise-axes b,
+.tracking-axes b {
+    color: var(--text-primary);
+}
+
+/* Motor Bar Chart */
+.motor-bar-chart {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+    height: 80px;
+    margin-top: 10px;
+}
+
+.motor-bar-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100%;
+    justify-content: flex-end;
+}
+
+.motor-bar {
+    width: 100%;
+    border-radius: 4px 4px 0 0;
+    transition: height 0.5s ease, background 0.3s;
+    min-height: 4px;
+}
+
+.motor-bar.bar-normal {
+    background: linear-gradient(180deg, var(--accent-blue), rgba(59, 130, 246, 0.4));
+}
+
+.motor-bar.bar-warning {
+    background: linear-gradient(180deg, #f59e0b, rgba(245, 158, 11, 0.4));
+}
+
+.motor-bar.bar-danger {
+    background: linear-gradient(180deg, #ef4444, rgba(239, 68, 68, 0.4));
+}
+
+.motor-bar-wrapper span {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+    font-weight: 600;
+}
+
+.motor-health-text {
+    font-size: 0.85rem;
+    margin-bottom: 4px;
+}
+
+/* Recommended Fixes Section */
+.report-fixes-section {
+    margin-top: 8px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-subtle);
+}
+
+.report-fixes-section h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 12px;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* =========================================================
+   Interactive Rates Tuning (Phase 4)
+   ========================================================= */
+
+.pid-rates-header,
+.pid-rates-row {
+    grid-template-columns: 60px repeat(4, 1fr) !important;
+}
+
+.rate-input {
+    width: 100%;
+    max-width: 72px;
+    background: rgba(2, 6, 23, 0.8);
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 5px 6px;
+    text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.rate-input::-webkit-inner-spin-button,
+.rate-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.rate-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(0, 240, 255, 0.15);
+}
+
+.rate-max-value {
+    font-weight: 700;
+    color: var(--accent);
+    font-size: 0.85rem;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.pid-template-btn.active {
+    border-color: var(--accent);
+    background: rgba(0, 240, 255, 0.12);
+    color: var(--accent);
+}
+
+.pid-template-btn:hover {
+    border-color: var(--accent);
+    transform: translateY(-1px);
+}
+
+.pid-template-indoor {
+    border-color: rgba(16, 185, 129, 0.4);
+    color: #10b981;
+}
+
+.pid-template-indoor:hover,
+.pid-template-indoor.active {
+    border-color: #10b981;
+    background: rgba(16, 185, 129, 0.12);
+    color: #10b981;
+}
+
+.btn-flash-rates {
+    width: 100%;
+    margin-top: 12px;
+    padding: 10px 16px;
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    border-radius: 8px;
+    background: rgba(16, 185, 129, 0.08);
+    color: #10b981;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-flash-rates:hover:not(:disabled) {
+    background: rgba(16, 185, 129, 0.18);
+    border-color: #10b981;
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.2);
+}
+
+.btn-flash-rates:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}

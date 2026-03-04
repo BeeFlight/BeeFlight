@@ -218,38 +218,61 @@
                                         <div class="data-card">
                                             <div class="card-header">Rates &amp; Stick Feel</div>
                                             <div class="card-body">
-                                                <canvas id="ratesChart" height="200"></canvas>
+                                                <canvas id="ratesChart"
+                                                    style="width:100%; height:200px; display:block; border-radius:8px;"></canvas>
                                                 <div class="pid-rates-table">
                                                     <div class="pid-rates-header">
                                                         <span>Axis</span>
                                                         <span>RC Rate</span>
                                                         <span>Super Rate</span>
                                                         <span>Expo</span>
+                                                        <span>Max (°/s)</span>
                                                     </div>
                                                     <div class="pid-rates-row">
                                                         <span>Roll</span>
-                                                        <span id="pidRollRcRate">—</span>
-                                                        <span id="pidRollSuperRate">—</span>
-                                                        <span id="pidRollExpo">—</span>
+                                                        <input type="number" step="0.01" min="0" max="3"
+                                                            id="pidRollRcRate" class="rate-input" value="0">
+                                                        <input type="number" step="0.01" min="0" max="1"
+                                                            id="pidRollSuperRate" class="rate-input" value="0">
+                                                        <input type="number" step="0.01" min="0" max="1"
+                                                            id="pidRollExpo" class="rate-input" value="0">
+                                                        <span id="pidRollMaxDeg" class="rate-max-value">—</span>
                                                     </div>
                                                     <div class="pid-rates-row">
                                                         <span>Pitch</span>
-                                                        <span id="pidPitchRcRate">—</span>
-                                                        <span id="pidPitchSuperRate">—</span>
-                                                        <span id="pidPitchExpo">—</span>
+                                                        <input type="number" step="0.01" min="0" max="3"
+                                                            id="pidPitchRcRate" class="rate-input" value="0">
+                                                        <input type="number" step="0.01" min="0" max="1"
+                                                            id="pidPitchSuperRate" class="rate-input" value="0">
+                                                        <input type="number" step="0.01" min="0" max="1"
+                                                            id="pidPitchExpo" class="rate-input" value="0">
+                                                        <span id="pidPitchMaxDeg" class="rate-max-value">—</span>
                                                     </div>
                                                     <div class="pid-rates-row">
                                                         <span>Yaw</span>
-                                                        <span id="pidYawRcRate">—</span>
-                                                        <span id="pidYawSuperRate">—</span>
-                                                        <span id="pidYawExpo">—</span>
+                                                        <input type="number" step="0.01" min="0" max="3"
+                                                            id="pidYawRcRate" class="rate-input" value="0">
+                                                        <input type="number" step="0.01" min="0" max="1"
+                                                            id="pidYawSuperRate" class="rate-input" value="0">
+                                                        <input type="number" step="0.01" min="0" max="1" id="pidYawExpo"
+                                                            class="rate-input" value="0">
+                                                        <span id="pidYawMaxDeg" class="rate-max-value">—</span>
                                                     </div>
                                                 </div>
 
                                                 <div class="pid-templates">
-                                                    <button class="pid-template-btn" data-template="cinematic">🎥 Cinematic Feel</button>
-                                                    <button class="pid-template-btn" data-template="race">🏎️ Race Feel</button>
+                                                    <button class="pid-template-btn" data-template="cinematic">🎥
+                                                        Cinematic Feel</button>
+                                                    <button class="pid-template-btn" data-template="freestyle">🦅
+                                                        Freestyle Feel</button>
+                                                    <button class="pid-template-btn" data-template="race">🏎️ Race
+                                                        Feel</button>
+                                                    <button class="pid-template-btn pid-template-indoor"
+                                                        data-template="indoor">🏠 Indoor
+                                                        (Whoop)</button>
                                                 </div>
+                                                <button id="btnFlashRates" class="btn-flash-rates" disabled>⚡ Flash
+                                                    Rates to Drone</button>
                                             </div>
                                         </div>
                                     </div>
@@ -420,9 +443,21 @@
                                                 class="data-value" id="valBboxRate">Scanning...</span></div>
                                     </div>
                                     <div class="storage-actions">
-                                        <button id="btnMountMsc" class="btn-primary"
-                                            style="background: var(--accent-purple); border-color: var(--accent-purple);">Mount
-                                            as USB Drive (Download Logs)</button>
+                                        <button id="btnMountMsc" class="btn-primary btn-large"
+                                            style="background: var(--accent-purple); border-color: var(--accent-purple);">
+                                            1. Reboot Drone as USB Drive
+                                        </button>
+                                        <div class="vtx-subtext" style="text-align: center; margin-bottom: 15px;">
+                                            Fastest way to retrieve logs.<br><br>
+                                            <span style="color: var(--status-warning); font-weight: 500;">
+                                                ⚠️ Note: While mounted as a USB Flash Drive, the drone cannot talk via
+                                                MSP.<br>
+                                                It will accurately reconnect when you eject the drive or reboot it.
+                                            </span>
+                                        </div>
+                                        <button id="btnScanLogs" class="btn-primary" style="margin-bottom: 15px;">
+                                            2. Scan Drone for Logs
+                                        </button>
                                         <button id="btnEraseFlash" class="btn-danger">Erase Flash</button>
                                     </div>
                                 </div>
@@ -430,26 +465,99 @@
 
                             <!-- Blackbox Log Analyzer -->
                             <div class="blackbox-analyzer">
-                                <div class="blackbox-dropzone" id="blackboxDropzone">
-                                    <input type="file" id="blackboxFileInput" accept=".bfl,.bbl,.csv" class="hidden">
-                                    <p class="dropzone-text">Drop your <strong>.bfl</strong> or <strong>.csv</strong> log file here</p>
-                                    <p class="dropzone-hint">Export CSV from <a href="https://blackbox.betaflight.com" target="_blank" rel="noopener">blackbox.betaflight.com</a> for full analysis</p>
+                                <div id="blackboxLogList" class="blackbox-log-list hidden">
+                                    <h3>Found Logs</h3>
+                                    <ul id="bflList" class="bfl-list"></ul>
+                                </div>
+                                <div class="blackbox-dropzone" id="blackboxDropzone" style="margin-top: 15px;">
+                                    <input type="file" id="blackboxFileInput" accept=".bbl,.csv,.txt" class="hidden">
+                                    <p class="dropzone-text">Or select a local <strong>.bbl</strong>, .csv, or .txt file
+                                    </p>
                                 </div>
                                 <div id="blackboxProgress" class="blackbox-progress hidden">
                                     <div class="progress-steps">
-                                        <span id="bbStep1" class="progress-step">1. Parsing Binary...</span>
-                                        <span id="bbStep2" class="progress-step">2. Running FFT Analysis...</span>
+                                        <span id="bbStep1" class="progress-step">1. Decoding Binary Data...</span>
+                                        <span id="bbStep2" class="progress-step">2. Running Analysis...</span>
                                         <span id="bbStep3" class="progress-step">3. Asking Copilot...</span>
                                     </div>
                                     <div class="progress-bar-track">
                                         <div id="blackboxProgressBar" class="progress-bar-fill"></div>
                                     </div>
                                 </div>
-                                <div id="blackboxReport" class="flight-report-card hidden">
-                                    <div class="report-header">Flight Report</div>
-                                    <div id="blackboxWarnings" class="report-warnings"></div>
-                                    <div id="blackboxMetrics" class="report-metrics"></div>
-                                    <div id="blackboxCopilotResponse" class="report-copilot"></div>
+                                <div id="blackboxReportDashboard" class="report-dashboard hidden">
+                                    <div class="report-dashboard-header">
+                                        <h3>🛩️ Flight Report</h3>
+                                        <button id="btnCloseReport" class="btn-secondary">✕ Close Report</button>
+                                    </div>
+
+                                    <!-- Flight Summary -->
+                                    <div id="reportFlightSummary" class="report-summary-text"></div>
+
+                                    <!-- 4-Card Grid -->
+                                    <div class="report-grid">
+                                        <div class="report-card" id="cardFlightStats">
+                                            <div class="report-card-icon">📊</div>
+                                            <div class="report-card-title">Flight Stats</div>
+                                            <div class="report-card-body">
+                                                <div class="stat-row"><span>Duration</span><span
+                                                        id="statDuration">—</span></div>
+                                                <div class="stat-row"><span>Max Throttle</span><span
+                                                        id="statMaxThrottle">—</span></div>
+                                                <div class="stat-row"><span>Frames</span><span id="statFrames">—</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="report-card" id="cardVibration">
+                                            <div class="report-card-icon" id="vibeIcon">📳</div>
+                                            <div class="report-card-title">Vibration & Noise</div>
+                                            <div class="report-card-body">
+                                                <div id="vibeStatus" class="vibe-indicator"></div>
+                                                <div class="noise-axes">
+                                                    <span>Roll: <b id="noiseRoll">—</b></span>
+                                                    <span>Pitch: <b id="noisePitch">—</b></span>
+                                                    <span>Yaw: <b id="noiseYaw">—</b></span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="report-card" id="cardMotorHealth">
+                                            <div class="report-card-icon">🚁</div>
+                                            <div class="report-card-title">Motor Health</div>
+                                            <div class="report-card-body">
+                                                <div id="motorHealthText" class="motor-health-text"></div>
+                                                <div class="motor-bar-chart">
+                                                    <div class="motor-bar-wrapper">
+                                                        <div class="motor-bar" id="motorBar1"></div><span>M1</span>
+                                                    </div>
+                                                    <div class="motor-bar-wrapper">
+                                                        <div class="motor-bar" id="motorBar2"></div><span>M2</span>
+                                                    </div>
+                                                    <div class="motor-bar-wrapper">
+                                                        <div class="motor-bar" id="motorBar3"></div><span>M3</span>
+                                                    </div>
+                                                    <div class="motor-bar-wrapper">
+                                                        <div class="motor-bar" id="motorBar4"></div><span>M4</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="report-card" id="cardPID">
+                                            <div class="report-card-icon">📈</div>
+                                            <div class="report-card-title">PID Tracking</div>
+                                            <div class="report-card-body">
+                                                <div id="pidPerformanceText"></div>
+                                                <div class="tracking-axes">
+                                                    <span>Roll Error: <b id="trackRoll">—</b></span>
+                                                    <span>Pitch Error: <b id="trackPitch">—</b></span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Recommended Fixes -->
+                                    <div id="reportRecommendedFixes" class="report-fixes-section hidden">
+                                        <h4>🔧 Recommended Fixes</h4>
+                                        <div id="reportActionCards"></div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -796,7 +904,10 @@
             <div class="dev-console" id="devConsole">
                 <div class="console-header" id="consoleToggle">
                     <span>System Logs</span>
-                    <svg class="console-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    <svg class="console-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
                 </div>
                 <div id="logOutput" class="console-output"></div>
             </div>
@@ -839,7 +950,9 @@
                     <small style="color: var(--text-muted); font-size: 0.75rem;">
                         Saved API keys for AI providers (Google, OpenAI, Anthropic, Groq). Stored in localStorage only.
                     </small>
-                    <button id="clearAiKeysBtn" class="btn-secondary" style="font-size: 0.8rem; align-self: flex-start; margin-top: 4px; color: var(--status-danger); border-color: var(--status-danger);">Clear All Saved AI Keys</button>
+                    <button id="clearAiKeysBtn" class="btn-secondary"
+                        style="font-size: 0.8rem; align-self: flex-start; margin-top: 4px; color: var(--status-danger); border-color: var(--status-danger);">Clear
+                        All Saved AI Keys</button>
                 </div>
                 <hr style="border-color: var(--border-subtle); opacity: 0.4; margin: 12px 0;">
                 <div class="setting-row" style="flex-direction: column; align-items: stretch; gap: 6px;">
@@ -855,8 +968,8 @@
                             placeholder="Google OAuth Client ID (for Drive exports)"
                             style="background: var(--bg-main); border: 1px solid var(--border-subtle); color: var(--text-primary); padding: 6px 10px; border-radius: 6px; font-size: 0.85rem;">
                         <div style="display: flex; align-items: center; gap: 8px;">
-                            <button id="saveGoogleClientIdBtn" class="btn-secondary"
-                                style="font-size: 0.8rem;">Save Client ID</button>
+                            <button id="saveGoogleClientIdBtn" class="btn-secondary" style="font-size: 0.8rem;">Save
+                                Client ID</button>
                             <span id="googleStatusLabel" style="font-size: 0.8rem; color: var(--text-muted);">Not
                                 connected</span>
                         </div>
@@ -895,7 +1008,8 @@
             <div class="modal-body api-key-modal-body">
                 <div id="apiKeyHelperContainer" class="api-key-helper">
                     <p id="apiKeyHelperSteps" class="api-key-helper-steps"></p>
-                    <a id="apiKeyHelperLink" href="#" target="_blank" rel="noopener noreferrer" class="api-key-helper-link"></a>
+                    <a id="apiKeyHelperLink" href="#" target="_blank" rel="noopener noreferrer"
+                        class="api-key-helper-link"></a>
                 </div>
                 <input type="password" id="providerKeyInput" class="input-field"
                     placeholder="Paste your API key here...">
@@ -920,6 +1034,7 @@
     <script src="cliParser.js"></script>
     <script src="drone3DBuilder.js"></script>
     <script src="osdEditor.js"></script>
+    <script src="aiService.js"></script>
     <script src="app.js"></script>
 </body>
 

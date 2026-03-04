@@ -1,21 +1,24 @@
 :root {
     /* Core Backgrounds */
-    --bg-app: #0f1115;       /* Deep space black */
-    --bg-panel: #1a1d24;     /* Slightly lighter for panel surfaces */
-    --bg-input: #232730;     /* Chat input */
-  
+    --bg-app: #0f1115;
+    /* Deep space black */
+    --bg-panel: #1a1d24;
+    /* Slightly lighter for panel surfaces */
+    --bg-input: #232730;
+    /* Chat input */
+
     /* Typography */
-    --text-primary: #ededed; 
-    --text-muted: #8b949e;   
-  
+    --text-primary: #ededed;
+    --text-muted: #8b949e;
+
     /* Accents & Status Alerts */
-    --accent-blue: #3b82f6;  
+    --accent-blue: #3b82f6;
     --accent-blue-hover: #2563eb;
     --accent-purple: #8b5cf6;
-    --status-success: #10b981; 
-    --status-warning: #f59e0b; 
-    --status-danger: #ef4444;  
-  
+    --status-success: #10b981;
+    --status-warning: #f59e0b;
+    --status-danger: #ef4444;
+
     /* Borders & Dividers */
     --border-subtle: #30363d;
 }
@@ -48,13 +51,15 @@ body {
 }
 
 .dashboard-panel {
-    flex: 1; /* Left/Center takes more space */
+    flex: 1;
+    /* Left/Center takes more space */
     border-right: 1px solid var(--border-subtle);
     background-color: var(--bg-app);
 }
 
 .copilot-panel {
-    flex: 0 0 400px; /* Fixed width for chat */
+    flex: 0 0 400px;
+    /* Fixed width for chat */
     background-color: var(--bg-panel);
 }
 
@@ -84,7 +89,8 @@ body {
     object-fit: contain;
 }
 
-h1, h2 {
+h1,
+h2 {
     font-weight: 600;
     font-size: 1.25rem;
     letter-spacing: -0.025em;
@@ -100,6 +106,7 @@ h1, h2 {
     background: var(--bg-input);
     color: var(--text-muted);
 }
+
 .status-badge.connected {
     background: rgba(16, 185, 129, 0.1);
     color: var(--status-success);
@@ -119,7 +126,8 @@ h1, h2 {
     display: flex;
     align-items: center;
     gap: 12px;
-    min-height: 44px; /* Touch target minimum */
+    min-height: 44px;
+    /* Touch target minimum */
 }
 
 .btn-primary:hover {
@@ -146,8 +154,9 @@ h1, h2 {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     padding: 40px;
+    overflow-y: auto;
 }
 
 .connect-section {
@@ -212,6 +221,22 @@ h1, h2 {
     align-items: center;
     gap: 8px;
     margin-top: 6px;
+}
+
+.action-dismiss {
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #ef4444;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.action-dismiss:hover {
+    background: rgba(239, 68, 68, 0.18);
+    border-color: #ef4444;
 }
 
 .action-spinner {

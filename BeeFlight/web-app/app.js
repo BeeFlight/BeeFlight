@@ -5,14 +5,14 @@
 
 // ---- AI Provider Registry ----
 const AI_PROVIDERS = {
-    'gemini-2.5-flash':     { provider: 'google',    label: 'Gemini 2.5 Flash',   keySlot: 'bfai_key_google' },
-    'gemini-2.0-flash':     { provider: 'google',    label: 'Gemini 2.0 Flash',   keySlot: 'bfai_key_google' },
-    'gemini-2.5-pro':       { provider: 'google',    label: 'Gemini 2.5 Pro',     keySlot: 'bfai_key_google' },
-    'gpt-4o':               { provider: 'openai',    label: 'GPT-4o',             keySlot: 'bfai_key_openai' },
-    'gpt-4o-mini':          { provider: 'openai',    label: 'GPT-4o Mini',        keySlot: 'bfai_key_openai' },
-    'claude-sonnet-4-20250514':    { provider: 'anthropic', label: 'Claude Sonnet 4',  keySlot: 'bfai_key_anthropic' },
-    'claude-3-5-haiku-20241022':   { provider: 'anthropic', label: 'Claude 3.5 Haiku', keySlot: 'bfai_key_anthropic' },
-    'groq-llama3-70b':      { provider: 'groq',      label: 'Llama 3 70B (Groq)', keySlot: 'bfai_key_groq' }
+    'gemini-2.5-flash': { provider: 'google', label: 'Gemini 2.5 Flash', keySlot: 'bfai_key_google' },
+    'gemini-2.0-flash': { provider: 'google', label: 'Gemini 2.0 Flash', keySlot: 'bfai_key_google' },
+    'gemini-2.5-pro': { provider: 'google', label: 'Gemini 2.5 Pro', keySlot: 'bfai_key_google' },
+    'gpt-4o': { provider: 'openai', label: 'GPT-4o', keySlot: 'bfai_key_openai' },
+    'gpt-4o-mini': { provider: 'openai', label: 'GPT-4o Mini', keySlot: 'bfai_key_openai' },
+    'claude-sonnet-4-20250514': { provider: 'anthropic', label: 'Claude Sonnet 4', keySlot: 'bfai_key_anthropic' },
+    'claude-3-5-haiku-20241022': { provider: 'anthropic', label: 'Claude 3.5 Haiku', keySlot: 'bfai_key_anthropic' },
+    'groq-llama3-70b': { provider: 'groq', label: 'Llama 3 70B (Groq)', keySlot: 'bfai_key_groq' }
 };
 
 const PROVIDER_LABELS = {
@@ -61,6 +61,7 @@ function setProviderKey(modelId, key) {
 
 // Legacy wrappers (still used by validation prompt and settings modal)
 function getApiKey() { return getProviderKey(activeModelId); }
+function getActiveProviderType() { return AI_PROVIDERS[activeModelId]?.provider || 'google'; }
 function setApiKey(key) { setProviderKey(activeModelId, key); }
 function promptForApiKey() {
     switchAIModel(activeModelId);
@@ -554,6 +555,10 @@ function renderAiResponse(rawText) {
     approveBtn.classList.add('btn-primary', 'action-approve');
     approveBtn.textContent = 'Approve & Flash';
 
+    const dismissBtn = document.createElement('button');
+    dismissBtn.classList.add('btn-secondary', 'action-dismiss');
+    dismissBtn.textContent = '✕ Dismiss';
+
     const spinner = document.createElement('div');
     spinner.classList.add('action-spinner', 'hidden');
 
@@ -565,6 +570,7 @@ function renderAiResponse(rawText) {
     undoBtn.textContent = '↩️ Undo (Rollback)';
 
     actionsRow.appendChild(approveBtn);
+    actionsRow.appendChild(dismissBtn);
     actionsRow.appendChild(spinner);
     actionsRow.appendChild(undoBtn);
 
@@ -647,6 +653,13 @@ function renderAiResponse(rawText) {
         statusText.textContent = '⏪ Rollback Complete';
         undoBtn.classList.add('hidden');
     });
+
+    dismissBtn.addEventListener('click', () => {
+        statusText.textContent = '🚫 Dismissed';
+        approveBtn.classList.add('hidden');
+        dismissBtn.classList.add('hidden');
+        card.style.opacity = '0.5';
+    });
 }
 
 function updateAiStatus() {
@@ -669,95 +682,8 @@ function updateAiStatus() {
 }
 aiStatusBadge.addEventListener('click', () => switchAIModel(activeModelId));
 
-// ---- Multi-provider AI Request Router ----
-async function routeAiRequest(systemPrompt, userText) {
-    const entry = AI_PROVIDERS[activeModelId];
-    if (!entry) throw new Error('Unknown AI model selected.');
-    const key = getProviderKey(activeModelId);
-    if (!key) {
-        switchAIModel(activeModelId);
-        throw new Error('API key required. Please enter it in the popup.');
-    }
-
-    const provider = entry.provider;
-
-    if (provider === 'google') {
-        const resp = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/${activeModelId}:generateContent?key=${key}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    systemInstruction: { parts: [{ text: systemPrompt }] },
-                    contents: [{ parts: [{ text: userText }] }]
-                })
-            }
-        );
-        if (!resp.ok) throw new Error(`Google API ${resp.status}`);
-        const data = await resp.json();
-        return data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    }
-
-    if (provider === 'openai') {
-        const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-            body: JSON.stringify({
-                model: activeModelId,
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userText }
-                ],
-                max_tokens: 2048
-            })
-        });
-        if (!resp.ok) throw new Error(`OpenAI API ${resp.status}`);
-        const data = await resp.json();
-        return data?.choices?.[0]?.message?.content || '';
-    }
-
-    if (provider === 'anthropic') {
-        const resp = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': key,
-                'anthropic-version': '2023-06-01',
-                'anthropic-dangerous-direct-browser-access': 'true'
-            },
-            body: JSON.stringify({
-                model: activeModelId,
-                max_tokens: 2048,
-                system: systemPrompt,
-                messages: [{ role: 'user', content: userText }]
-            })
-        });
-        if (!resp.ok) throw new Error(`Anthropic API ${resp.status}`);
-        const data = await resp.json();
-        return data?.content?.[0]?.text || '';
-    }
-
-    if (provider === 'groq') {
-        const groqModel = 'llama3-70b-8192';
-        const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-            body: JSON.stringify({
-                model: groqModel,
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userText }
-                ],
-                max_tokens: 2048
-            })
-        });
-        if (!resp.ok) throw new Error(`Groq API ${resp.status}`);
-        const data = await resp.json();
-        return data?.choices?.[0]?.message?.content || '';
-    }
-
-    throw new Error(`Unsupported provider: ${provider}`);
-}
+// ---- Multi-provider AI Request Router (Replaced by aiService.js) ----
+// Note: See aiService.js for the complete adapter pattern implementation.
 
 // ---------------------------------------------------------
 // AI Copilot — Gemini API (Overhauled System Prompt)
@@ -798,6 +724,11 @@ ${droneState.cliDiff || '(Not yet synced — CLI diff has not been captured yet.
 - **Formatting rules:** Use Markdown. Use **bold** for key values (firmware versions, protocol names, numbers). Use bullet lists sparingly (max 3–4 items). Never write a paragraph longer than 3 sentences. Use headings (###) only when listing multiple distinct topics.
 - **No filler.** Do not start responses with "Sure!", "Great question!", "Absolutely!", or similar. Get straight to the answer.
 
+## Understanding Betaflight CLI Dumps
+- The user provides a diff or diff all, which only contains settings that differ from the firmware defaults. If a variable (like blackbox_mode or blackbox_device) is NOT in the text, you must assume it is set to its factory default value. Do not tell the user the data is 'missing' or 'not explicitly shown'.
+- To determine if Blackbox logging is enabled, look at the feature list. If feature BLACKBOX is present, logging is enabled. If blackbox_device = SPIFLASH or SDCARD is present, it is active. If blackbox_device = NONE is present, it is completely disabled.
+- Stop using filler phrases like 'the configuration diff indicates' or 'in the provided telemetry'. Speak directly and confidently. If you see it, say it.
+
 ## RULES
 - Reference live telemetry for current state (armed, tilt, stick positions) and the configuration diff for settings (PIDs, filters, UARTs, VTX, OSD).
 - If the user asks to calibrate voltage or amperage, use CLI data to find the current scale. Formula: New Scale = Old Scale * (Drone Reading / Multimeter Reading). Generate the \`set vbat_scale = [NEW_VALUE]\` and \`save\` CLI commands.
@@ -810,6 +741,9 @@ ${droneState.cliDiff || '(Not yet synced — CLI diff has not been captured yet.
 - HOT MOTORS: Suggest lowering d_pitch/d_roll by ~10–15%. If dterm_lowpass_hz > 150Hz, recommend reducing it. Never increase D-term for hot motors.
 - PROPWASH SHAKES: Suggest small d_pitch/d_roll increases (within limits) and/or reducing filter delay, respecting the D-term safety rule.
 - CINEMATIC RATES: Propose rc_rate/rc_expo changes for softer center stick, output as action JSON.
+- TWITCHY CENTER STICK: If the user complains about 'twitchy', 'sensitive', or 'jittery' controls near center stick, suggest an Action Card that increases roll_expo and pitch_expo by ~10 (e.g., from 0 to 10 or from 10 to 20) or lowers rc_rate. Never set expo above 80.
+- SLOW FLIPS/ROLLS: If the user complains that flips, rolls, or rotations feel too slow or take too long, suggest an Action Card that increases roll_srate and pitch_srate by ~5-10. If super rate is already above 80, warn about potential loss of control.
+- INDOOR / TIGHT SPACES: If the user mentions flying indoors, hitting the ceiling, struggling through doors or windows, or flying a Whoop, suggest the 'Indoor' rate profile (RC Rate: 0.7, Super Rate: 0.55, Expo: 0.60). Explain that setting Expo to 0.60 deeply flattens the center stick response, giving much finer micro-movement control in tight quarters while still allowing full rotation at max deflection.
 - SAFETY D-TERM LIMIT: Never increase d_roll/d_pitch/d_yaw by more than 5 points at a time. If already above 50, recommend reductions.
 
 ## ACTION FORMAT
@@ -822,12 +756,12 @@ When the user asks you to change a configuration setting (PIDs, rates, filters, 
 Do not include any additional fields. Do not wrap the JSON in markdown besides the single \`\`\`action fence. All CLI commands must be in the commands array only.`;
 
     try {
-        const responseText = await routeAiRequest(systemPrompt, userText);
+        const responseText = await window.generateAIResponse(getActiveProviderType(), activeModelId, systemPrompt, userText, apiKey);
         renderAiResponse(responseText);
     } catch (err) {
-        log.error('Gemini API call failed', err);
-        logToConsole(`Gemini Error: ${err.message}`, 'error');
-        appendChatMessage('ai', `Error reaching Gemini. Check console logs.`);
+        log.error('AI API call failed', err);
+        logToConsole(`AI copilot error: ${err.message}`, 'error');
+        appendChatMessage('ai', `Error reaching AI provider. Check console logs.`);
     } finally {
         thinkingIndicator.classList.add('hidden');
         chatInput.disabled = false;
@@ -1313,15 +1247,21 @@ async function captureCliDiff() {
 navigator.serial.addEventListener('disconnect', (event) => {
     if (event.target === port || !port) {
         log.info('USB Disconnect event: FC dropped connection');
-        if (!isReconnectingAfterCli) {
-            logToConsole('Drone disconnected.', 'error');
-        }
-        droneState.connected = false;
-        connectionStatus.textContent = "Disconnected";
-        connectionStatus.classList.remove("connected");
         stopPolling();
         // Clear session history on disconnect to prevent cross-drone rollbacks
         if (window.sessionHistory) window.sessionHistory = [];
+
+        if (isReconnectingAfterCli) {
+            droneState.connected = false;
+        } else {
+            // Auto-Reconnect scenario triggered manually or unexpectedly
+            isReconnecting = true;
+            droneState.connected = false;
+            connectionStatus.textContent = "Waiting for USB...";
+            connectionStatus.style.color = "var(--status-warning)";
+            connectionStatus.style.background = "rgba(245,158,11,0.1)";
+            connectionStatus.classList.remove("connected");
+        }
     }
 });
 
@@ -1346,8 +1286,53 @@ navigator.serial.addEventListener('connect', async (event) => {
             logToConsole(`MSP init failed: ${err.message}`, 'error');
             syncOverlay.classList.add('hidden');
         }
+    } else if (isReconnecting) {
+        log.info('Auto-reconnect engine tracking...');
+        setTimeout(async () => {
+            try {
+                const ports = await navigator.serial.getPorts();
+                const matchedPort = ports.find(p => {
+                    const info = p.getInfo();
+                    return info.usbVendorId === connectedVid && info.usbProductId === connectedPid;
+                });
+
+                if (matchedPort) {
+                    port = matchedPort;
+                    await port.open({ baudRate: 115200 });
+                    droneState.connected = true;
+                    connectionStatus.textContent = "Auto-Reconnected!";
+                    connectionStatus.style.color = "var(--status-success)";
+                    connectionStatus.style.background = "rgba(16,185,129,0.1)";
+                    connectionStatus.classList.add("connected");
+
+                    setTimeout(() => {
+                        if (droneState.connected) {
+                            connectionStatus.textContent = "Connected";
+                            connectionStatus.style.color = "";
+                            connectionStatus.style.background = "";
+                        }
+                    }, 3000);
+
+                    writer = port.writable.getWriter();
+                    startMspReadLoop();
+                    await initializeDrone();
+                    isReconnecting = false;
+                    logToConsole('Auto-reconnected seamlessly.', 'success');
+                }
+            } catch (err) {
+                log.error('Auto-reconnect failed', err);
+                isReconnecting = false;
+                connectionStatus.textContent = "Disconnected";
+                connectionStatus.style.color = "";
+                connectionStatus.style.background = "";
+            }
+        }, 800); // Give the FC USB stack 800ms
     }
 });
+
+let connectedVid = null;
+let connectedPid = null;
+let isReconnecting = false;
 
 async function connectToDrone() {
     if (!('serial' in navigator)) {
@@ -1356,6 +1341,9 @@ async function connectToDrone() {
     }
     try {
         port = await navigator.serial.requestPort();
+        const info = port.getInfo();
+        connectedVid = info.usbVendorId;
+        connectedPid = info.usbProductId;
     } catch (err) {
         log.error('Serial port request cancelled', err);
         logToConsole('Connection cancelled.', 'error');
@@ -1484,6 +1472,10 @@ sidebarItems.forEach(item => {
         if (viewElement) viewElement.classList.add('active');
 
         if (viewId === 'view-blackbox') renderBlackboxTab();
+        if (viewId === 'view-pids') {
+            wireRatesEngine();
+            setTimeout(() => { updateMaxValues(); drawRateCurve(); }, 50);
+        }
     });
 });
 
@@ -1707,6 +1699,8 @@ function renderApiKeyModalContent(providerKey) {
     if (securityEl) securityEl.textContent = `Your API key is stored securely in your browser's local storage and is never sent to our servers. You communicate directly with ${name}.`;
 }
 
+window.appState = { activeAIProvider: '', activeAIModel: '' };
+
 function switchAIModel(modelId) {
     const entry = AI_PROVIDERS[modelId];
     if (!entry) return;
@@ -1722,6 +1716,17 @@ function switchAIModel(modelId) {
 
     activeModelId = modelId;
     localStorage.setItem('bfai_active_model', modelId);
+
+    let providerName = '';
+    if (entry.provider === 'google') providerName = 'Gemini';
+    else if (entry.provider === 'openai') providerName = 'OpenAI';
+    else if (entry.provider === 'anthropic') providerName = 'Anthropic';
+    else if (entry.provider === 'grok') providerName = 'Grok';
+    else if (entry.provider === 'groq') providerName = 'Groq';
+
+    window.appState.activeAIProvider = providerName;
+    window.appState.activeAIModel = modelId;
+
     updateAiStatus();
     appendChatMessage('ai', `Switched to **${entry.label}**.`);
     log.info(`AI model switched to ${entry.label} (${modelId})`);
@@ -1744,6 +1749,16 @@ if (saveProviderKeyBtn) {
             const entry = AI_PROVIDERS[pendingSwitchModelId];
             activeModelId = pendingSwitchModelId;
             localStorage.setItem('bfai_active_model', pendingSwitchModelId);
+
+            let providerName = '';
+            if (entry.provider === 'google') providerName = 'Gemini';
+            else if (entry.provider === 'openai') providerName = 'OpenAI';
+            else if (entry.provider === 'anthropic') providerName = 'Anthropic';
+            else if (entry.provider === 'grok') providerName = 'Grok';
+            else if (entry.provider === 'groq') providerName = 'Groq';
+
+            window.appState.activeAIProvider = providerName;
+            window.appState.activeAIModel = pendingSwitchModelId;
             updateAiStatus();
             appendChatMessage('ai', `Switched to **${entry.label}**.`);
             log.info(`AI model switched to ${entry.label} (${pendingSwitchModelId})`);
@@ -2116,7 +2131,8 @@ General rules:
 - If you are uncertain about any key, set it to false and explain why in the reasoning string.`;
 
     try {
-        let raw = await routeAiRequest(systemPrompt, JSON.stringify(context));
+        const apiKey = getProviderKey(activeModelId);
+        let raw = await window.generateAIResponse(getActiveProviderType(), activeModelId, systemPrompt, JSON.stringify(context), apiKey);
         raw = (raw || '').trim();
         if (!raw) throw new Error('Empty validation response from AI');
 
@@ -2218,6 +2234,191 @@ async function restoreCliData(fullText) {
 }
 
 // ---------------------------------------------------------
+// ---------------------------------------------------------
+// Interactive Rates Engine (global scope)
+// ---------------------------------------------------------
+const RATE_PRESETS = {
+    cinematic: { rcRate: 0.8, superRate: 0.5, expo: 0.4 },
+    freestyle: { rcRate: 1.0, superRate: 0.7, expo: 0.2 },
+    race: { rcRate: 1.0, superRate: 0.5, expo: 0.1 },
+    indoor: { rcRate: 0.7, superRate: 0.55, expo: 0.6 }
+};
+const RATE_AXES = ['Roll', 'Pitch', 'Yaw'];
+const AXIS_COLORS = { Roll: '#3b82f6', Pitch: '#22c55e', Yaw: '#f59e0b' };
+
+function calcBFRate(rcCommand, rcRate, superRate, expo) {
+    const rcCommandf = rcCommand;
+    const expof = rcCommandf * (Math.pow(rcCommandf, 3) * expo + rcCommandf * (1 - expo));
+    const angleRate = 200.0 * rcRate * expof;
+    if (superRate > 0 && superRate < 1) {
+        return angleRate * (1.0 / (1.0 - (rcCommandf * superRate)));
+    }
+    return angleRate;
+}
+
+function getMaxDegPerSec(rcRate, superRate, expo) {
+    return Math.round(calcBFRate(1.0, rcRate, superRate, expo));
+}
+
+function readRateInputs() {
+    const result = {};
+    RATE_AXES.forEach(axis => {
+        result[axis] = {
+            rcRate: parseFloat(document.getElementById(`pid${axis}RcRate`)?.value) || 0,
+            superRate: parseFloat(document.getElementById(`pid${axis}SuperRate`)?.value) || 0,
+            expo: parseFloat(document.getElementById(`pid${axis}Expo`)?.value) || 0
+        };
+    });
+    return result;
+}
+
+function updateMaxValues() {
+    const rates = readRateInputs();
+    RATE_AXES.forEach(axis => {
+        const el = document.getElementById(`pid${axis}MaxDeg`);
+        if (el) el.textContent = getMaxDegPerSec(rates[axis].rcRate, rates[axis].superRate, rates[axis].expo);
+    });
+}
+
+function drawRateCurve() {
+    const canvas = document.getElementById('ratesChart');
+    if (!canvas || !canvas.getContext) return;
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return; // tab not visible
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    const w = rect.width;
+    const h = rect.height;
+
+    ctx.fillStyle = '#020617';
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.15)';
+    ctx.lineWidth = 0.5;
+    for (let i = 1; i < 4; i++) {
+        ctx.beginPath(); ctx.moveTo(0, (h / 4) * i); ctx.lineTo(w, (h / 4) * i); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo((w / 4) * i, 0); ctx.lineTo((w / 4) * i, h); ctx.stroke();
+    }
+
+    ctx.font = '10px sans-serif';
+    ctx.fillStyle = 'rgba(148, 163, 184, 0.5)';
+    ctx.fillText('0%', 2, h - 4);
+    ctx.fillText('100%', w - 32, h - 4);
+
+    const rates = readRateInputs();
+    const allMax = Math.max(
+        ...RATE_AXES.map(a => getMaxDegPerSec(rates[a].rcRate, rates[a].superRate, rates[a].expo)),
+        200
+    );
+
+    RATE_AXES.forEach(axis => {
+        const r = rates[axis];
+        ctx.strokeStyle = AXIS_COLORS[axis];
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (let i = 0; i <= 60; i++) {
+            const stick = i / 60;
+            const degPS = calcBFRate(stick, r.rcRate, r.superRate, r.expo);
+            const x = stick * w;
+            const y = h - (degPS / allMax) * h;
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+    });
+
+    let legendX = w - 90;
+    ctx.font = '11px sans-serif';
+    RATE_AXES.forEach(axis => {
+        ctx.fillStyle = AXIS_COLORS[axis];
+        ctx.fillRect(legendX, 8, 10, 10);
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillText(axis, legendX + 14, 17);
+        legendX += 30;
+    });
+    ctx.fillStyle = 'rgba(148, 163, 184, 0.5)';
+    ctx.fillText(`${allMax}°/s`, 2, 14);
+}
+
+let ratesEngineWired = false;
+function wireRatesEngine() {
+    if (ratesEngineWired) return;
+    ratesEngineWired = true;
+
+    // Live input → redraw
+    document.querySelectorAll('.rate-input').forEach(input => {
+        input.addEventListener('input', () => {
+            updateMaxValues();
+            drawRateCurve();
+            const flashBtn = document.getElementById('btnFlashRates');
+            if (flashBtn) flashBtn.disabled = false;
+        });
+    });
+
+    // Preset buttons
+    document.querySelectorAll('.pid-template-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const preset = RATE_PRESETS[btn.getAttribute('data-template')];
+            if (!preset) return;
+            document.querySelectorAll('.pid-template-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            RATE_AXES.forEach(axis => {
+                const rc = document.getElementById(`pid${axis}RcRate`);
+                const sr = document.getElementById(`pid${axis}SuperRate`);
+                const ex = document.getElementById(`pid${axis}Expo`);
+                if (rc) rc.value = preset.rcRate;
+                if (sr) sr.value = preset.superRate;
+                if (ex) ex.value = preset.expo;
+            });
+            updateMaxValues();
+            drawRateCurve();
+            const flashBtn = document.getElementById('btnFlashRates');
+            if (flashBtn) flashBtn.disabled = false;
+        });
+    });
+
+    // Flash Rates button
+    const flashRatesBtn = document.getElementById('btnFlashRates');
+    if (flashRatesBtn) {
+        flashRatesBtn.addEventListener('click', async () => {
+            const rates = readRateInputs();
+            const commands = [
+                `set roll_rc_rate = ${Math.round(rates.Roll.rcRate * 100)}`,
+                `set pitch_rc_rate = ${Math.round(rates.Pitch.rcRate * 100)}`,
+                `set yaw_rc_rate = ${Math.round(rates.Yaw.rcRate * 100)}`,
+                `set roll_srate = ${Math.round(rates.Roll.superRate * 100)}`,
+                `set pitch_srate = ${Math.round(rates.Pitch.superRate * 100)}`,
+                `set yaw_srate = ${Math.round(rates.Yaw.superRate * 100)}`,
+                `set roll_expo = ${Math.round(rates.Roll.expo * 100)}`,
+                `set pitch_expo = ${Math.round(rates.Pitch.expo * 100)}`,
+                `set yaw_expo = ${Math.round(rates.Yaw.expo * 100)}`,
+                'save'
+            ];
+            flashRatesBtn.disabled = true;
+            flashRatesBtn.textContent = '⏳ Flashing...';
+            try {
+                await restoreCliData(commands.join('\n'));
+                flashRatesBtn.textContent = '✅ Rates Applied!';
+                setTimeout(() => { flashRatesBtn.textContent = '⚡ Flash Rates to Drone'; flashRatesBtn.disabled = false; }, 2500);
+            } catch (err) {
+                flashRatesBtn.textContent = '❌ Flash Failed';
+                log.error('Flash rates failed', err);
+                setTimeout(() => { flashRatesBtn.textContent = '⚡ Flash Rates to Drone'; flashRatesBtn.disabled = false; }, 2500);
+            }
+        });
+    }
+
+    // Initial draw
+    updateMaxValues();
+    drawRateCurve();
+}
+
+// Wire the engine on load so it works immediately without drone connection
+document.addEventListener('DOMContentLoaded', () => { wireRatesEngine(); });
+
+// ---------------------------------------------------------
 // PID Tuning & Rates Tab Rendering
 // ---------------------------------------------------------
 function renderPidTab() {
@@ -2232,20 +2433,6 @@ function renderPidTab() {
     const rateProfileEl = document.getElementById('rateProfileValue');
     if (pidProfileEl) pidProfileEl.textContent = String(dyn.profile);
     if (rateProfileEl) rateProfileEl.textContent = String(dyn.rateProfile);
-
-    // Rates table
-    const rateAxes = ['roll', 'pitch', 'yaw'];
-    rateAxes.forEach(axis => {
-        const rates = dyn.rates[axis];
-        if (!rates) return;
-        const prefix = axis.charAt(0).toUpperCase() + axis.slice(1);
-        const rcRateEl = document.getElementById(`pid${prefix}RcRate`);
-        const superRateEl = document.getElementById(`pid${prefix}SuperRate`);
-        const expoEl = document.getElementById(`pid${prefix}Expo`);
-        if (rcRateEl) rcRateEl.textContent = rates.rcRate !== null ? String(rates.rcRate) : '—';
-        if (superRateEl) superRateEl.textContent = rates.superRate !== null ? String(rates.superRate) : '—';
-        if (expoEl) expoEl.textContent = rates.expo !== null ? String(rates.expo) : '—';
-    });
 
     // PID table
     const pidAxes = ['roll', 'pitch', 'yaw'];
@@ -2263,62 +2450,27 @@ function renderPidTab() {
         if (fEl) fEl.textContent = pid.f !== null ? String(pid.f) : '—';
     });
 
-    // Rates chart (simple Bezier curve based on expo)
-    const canvas = document.getElementById('ratesChart');
-    if (canvas && canvas.getContext) {
-        const ctx = canvas.getContext('2d');
-        const width = canvas.width || canvas.clientWidth || 400;
-        const height = canvas.height || 200;
+    // Populate rate inputs from parsed dynamics
+    const rateAxes = ['roll', 'pitch', 'yaw'];
+    rateAxes.forEach(axis => {
+        const rates = dyn.rates[axis];
+        if (!rates) return;
+        const prefix = axis.charAt(0).toUpperCase() + axis.slice(1);
+        const rcRateEl = document.getElementById(`pid${prefix}RcRate`);
+        const superRateEl = document.getElementById(`pid${prefix}SuperRate`);
+        const expoEl = document.getElementById(`pid${prefix}Expo`);
+        if (rcRateEl) rcRateEl.value = rates.rcRate !== null ? rates.rcRate : 0;
+        if (superRateEl) superRateEl.value = rates.superRate !== null ? rates.superRate : 0;
+        if (expoEl) expoEl.value = rates.expo !== null ? rates.expo : 0;
+    });
 
-        // Clear
-        ctx.clearRect(0, 0, width, height);
+    // Redraw with synced values
+    updateMaxValues();
+    drawRateCurve();
 
-        // Background
-        ctx.fillStyle = '#020617';
-        ctx.fillRect(0, 0, width, height);
-
-        // Grid
-        ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(0, height - 1);
-        ctx.lineTo(width, height - 1);
-        ctx.moveTo(1, 0);
-        ctx.lineTo(1, height);
-        ctx.stroke();
-
-        // Use pitch expo as representative
-        const expo = dyn.rates.pitch && typeof dyn.rates.pitch.expo === 'number' ? dyn.rates.pitch.expo : 0;
-        const expoNorm = Math.max(0, Math.min(1, expo));
-
-        // Control points for Bezier (0,0) to (1,1) shaped by expo
-        const p0 = { x: 0, y: height };
-        const p3 = { x: width, y: 0 };
-        const p1 = { x: width * 0.3, y: height * (1 - 0.6 * expoNorm) };
-        const p2 = { x: width * 0.7, y: height * (0.4 + 0.4 * expoNorm) };
-
-        ctx.strokeStyle = '#0ea5e9';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(p0.x, p0.y);
-
-        const steps = 40;
-        for (let i = 1; i <= steps; i++) {
-            const t = i / steps;
-            const x =
-                Math.pow(1 - t, 3) * p0.x +
-                3 * Math.pow(1 - t, 2) * t * p1.x +
-                3 * (1 - t) * Math.pow(t, 2) * p2.x +
-                Math.pow(t, 3) * p3.x;
-            const y =
-                Math.pow(1 - t, 3) * p0.y +
-                3 * Math.pow(1 - t, 2) * t * p1.y +
-                3 * (1 - t) * Math.pow(t, 2) * p2.y +
-                Math.pow(t, 3) * p3.y;
-            ctx.lineTo(x, y);
-        }
-        ctx.stroke();
-    }
+    // Enable flash button on connected
+    const flashBtn2 = document.getElementById('btnFlashRates');
+    if (flashBtn2) flashBtn2.disabled = false;
 
     // Symptom badges wiring
     document.querySelectorAll('.symptom-badge').forEach(btn => {
@@ -2327,24 +2479,6 @@ function renderPidTab() {
             if (!prompt || !chatInput) return;
             chatInput.value = prompt;
             chatInput.focus();
-        });
-    });
-
-    // Template buttons wiring (prompt only, AI will turn into CLI)
-    document.querySelectorAll('.pid-template-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const template = btn.getAttribute('data-template');
-            if (!template || !chatInput) return;
-            let text = '';
-            if (template === 'cinematic') {
-                text = 'I want cinematic, smooth rates with softer center stick and reduced max rotation speed. Please suggest safe RC rate and expo changes for all axes and give me the CLI commands.';
-            } else if (template === 'race') {
-                text = 'I want aggressive race rates with fast roll and pitch but still controllable around center. Please suggest safe RC rate, super rate, and expo values and give me the CLI commands.';
-            }
-            if (text) {
-                chatInput.value = text;
-                chatInput.focus();
-            }
         });
     });
 }
@@ -2386,10 +2520,71 @@ function renderBlackboxTab() {
         if (eraseBtn) eraseBtn.onclick = () => sendMessageToCopilot('I want to erase my Blackbox flash storage. Please give me the CLI command and warn me about data loss.');
     }
 
+    const scanBtn = document.getElementById('btnScanLogs');
+    if (scanBtn && !scanBtn.onclick) {
+        scanBtn.onclick = () => accessDroneLogs();
+    }
+
     // Blackbox Log Analyzer (wire once)
     if (!blackboxDropzoneWired && window.BlackboxParser) {
         wireBlackboxAnalyzer();
         blackboxDropzoneWired = true;
+    }
+}
+
+async function accessDroneLogs() {
+    try {
+        if (!('showDirectoryPicker' in window)) {
+            showToast('Your browser does not support scanning directories. Please use the fallback file selector.', 'warning');
+            document.getElementById('blackboxFileInput').click();
+            return;
+        }
+
+        const directoryHandle = await window.showDirectoryPicker();
+        const bflFiles = [];
+
+        for await (const entry of directoryHandle.values()) {
+            const name = entry.name.toLowerCase();
+            if (entry.kind === 'file' && (name.endsWith('.bbl') || name.endsWith('.csv') || name.endsWith('.txt'))) {
+                const file = await entry.getFile();
+                bflFiles.push({ file, handle: entry });
+            }
+        }
+
+        if (bflFiles.length === 0) {
+            showToast('No .bbl, .csv, or .txt logs found in the selected directory.', 'warning');
+            return;
+        }
+
+        const logListDiv = document.getElementById('blackboxLogList');
+        const bflListUl = document.getElementById('bflList');
+        if (logListDiv && bflListUl) {
+            logListDiv.classList.remove('hidden');
+            bflListUl.innerHTML = '';
+
+            bflFiles.forEach(({ file, handle }) => {
+                const li = document.createElement('li');
+                li.className = 'bfl-item';
+                const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
+                li.innerHTML = `📄 ${file.name} - ${sizeMb} MB`;
+                li.style.cursor = 'pointer';
+                li.style.padding = '8px';
+                li.style.borderBottom = '1px solid var(--border-color)';
+
+                li.addEventListener('click', async () => {
+                    const f = await handle.getFile();
+                    runAnalysis(f);
+                });
+                bflListUl.appendChild(li);
+            });
+            showToast(`Found ${bflFiles.length} log files.`, 'success');
+        }
+
+    } catch (err) {
+        if (err.name !== 'AbortError') {
+            log.error('Error accessing drone logs directory', err);
+            showToast('Failed to access directory. Try the fallback file selector.', 'error');
+        }
     }
 }
 
@@ -2400,61 +2595,150 @@ async function analyzeBlackboxWithAI(summary) {
         throw new Error('API key required for analysis.');
     }
 
-    const systemPrompt = `You are an elite Blackbox Data Analyst. The user will provide a JSON summary of their flight log.
+    const systemPrompt = `You are an elite Blackbox Flight Data Analyst for FPV drones. The user will provide a JSON summary of a parsed flight log.
 
-## RULES
-- Look at peakResonances. If there is high noise below 150Hz, output an Action Card to lower their dynamic notch or lowpass filters (e.g. dyn_notch_count, gyro_lowpass_hz, dterm_lowpass_hz).
-- Look at motorAverages. If one motor is >15% higher than the rest, warn the user to check their hardware (propellers, bearings, motor screws) BEFORE changing any software tunes. Do not output an action card for hardware issues.
-- Look at pidTracking. If the error is high, suggest increasing P and I gains via an Action Card.
-- Output your tuning fixes using the \`\`\`action JSON format:
+You MUST respond with ONLY a valid JSON object (no markdown fences, no extra text). Use this exact schema:
+
 {
-  "intent": "<short description>",
-  "summary": "<1-2 sentence explanation>",
-  "commands": ["set ...", "set ...", "save"]
+  "flightSummary": "<2 sentences describing the flight aggressiveness and style based on maxThrottle, flightDuration, and trackingError>",
+  "vibrationHealth": "<Analysis of dominantNoiseHz. Say 'Clean frame — no concerning resonances' if all axes < 80Hz or zero. Say 'Moderate vibration at XHz on [axis]' if 80-150Hz. Say 'Severe resonance at XHz on [axis] — check frame/motor mounts' if > 150Hz with high magnitude>",
+  "motorHealth": "<Analysis of motorAverages. If one motor is >15% higher than the average, warn: 'Motor N is working X% harder — check props, bearings, motor screws'. If balanced, say 'All motors are within normal range'.>",
+  "pidPerformance": "<Analysis of trackingError. If roll or pitch error > 40, suggest increasing P/I gains. If < 20, say 'Tracking is responsive'. Mention the specific axis.>",
+  "recommendedActions": [
+    {
+      "intent": "<short human-readable title>",
+      "summary": "<1-2 sentence explanation>",
+      "commands": ["set ...", "set ...", "save"]
+    }
+  ]
 }
-- If no software changes are needed, respond with a brief text explanation only (no action block).
-- Be concise. Max 2-3 bullet points.`;
 
-    const responseText = await routeAiRequest(systemPrompt, JSON.stringify(summary, null, 2));
+RULES:
+- recommendedActions MUST be an array. If no software changes are needed, use an empty array [].
+- Do NOT wrap the JSON in markdown code fences. Return raw JSON only.
+- Do NOT output any text outside the JSON object.
+- For hardware issues (bent props, loose screws), put the warning in motorHealth text but do NOT add a recommendedAction for it.
+- flightSummary should mention whether the flight was aggressive, moderate, or gentle based on maxThrottle and trackingError values.`;
+
+    const responseText = await window.generateAIResponse(getActiveProviderType(), activeModelId, systemPrompt, JSON.stringify(summary, null, 2), apiKey);
     return responseText;
 }
 
-function renderBlackboxReport(summary, aiResponse) {
-    const warningsEl = document.getElementById('blackboxWarnings');
-    const metricsEl = document.getElementById('blackboxMetrics');
-    const copilotEl = document.getElementById('blackboxCopilotResponse');
-    const reportCard = document.getElementById('blackboxReport');
+function renderBlackboxReport(summary, aiResponseText) {
+    const dashboard = document.getElementById('blackboxReportDashboard');
+    if (!dashboard) return;
 
-    if (!warningsEl || !metricsEl || !copilotEl || !reportCard) return;
-
-    const badges = [];
-    const avg = summary.motorAverages.reduce((a, b) => a + b, 0) / 4 || 1;
-    summary.motorAverages.forEach((m, i) => {
-        if (m > avg * 1.15) badges.push({ type: 'danger', text: `High Motor ${i + 1} Load (${m.toFixed(0)}%)` });
-    });
-    (summary.peakResonances || []).forEach(f => {
-        if (f < 150 && f > 0) badges.push({ type: 'warning', text: `Frame Resonance at ${f}Hz` });
-    });
-    if (summary.pidTracking != null && summary.pidTracking > 50) {
-        badges.push({ type: 'warning', text: `High PID Tracking Error (${summary.pidTracking.toFixed(0)})` });
+    // --- Parse AI JSON (with fallback) ---
+    let aiData = null;
+    try {
+        let cleaned = (aiResponseText || '').trim();
+        // Strip markdown fences if AI wrapped it despite instructions
+        if (cleaned.startsWith('```')) {
+            cleaned = cleaned.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+        }
+        aiData = JSON.parse(cleaned);
+    } catch (e) {
+        console.warn('AI response was not valid JSON, rendering as markdown fallback.', e);
     }
 
-    warningsEl.innerHTML = badges.map(b => `<span class="report-badge ${b.type}">${b.text}</span>`).join('') || '<span class="report-badge info">No critical issues detected</span>';
+    // --- Flight Stats Card ---
+    const dur = document.getElementById('statDuration');
+    const thr = document.getElementById('statMaxThrottle');
+    const frm = document.getElementById('statFrames');
+    if (dur) dur.textContent = summary.flightDuration ? `${summary.flightDuration}s` : '—';
+    if (thr) thr.textContent = summary.maxThrottle ? `${summary.maxThrottle}%` : '—';
+    if (frm) frm.textContent = summary.frameCount || '—';
 
-    let metricsHtml = `Frames: ${summary.frameCount || 0}`;
-    if (summary.peakResonances && summary.peakResonances.length) metricsHtml += ` · Peak resonances: ${summary.peakResonances.join(', ')} Hz`;
-    if (summary.pidTracking != null) metricsHtml += ` · PID error: ${summary.pidTracking.toFixed(1)}`;
-    if (summary.motorAverages && summary.motorAverages.length) metricsHtml += ` · Motor avg: ${summary.motorAverages.map(m => m.toFixed(0)).join(', ')}%`;
-    metricsEl.textContent = metricsHtml;
-
-    copilotEl.innerHTML = '';
-    if (aiResponse && typeof marked !== 'undefined') {
-        copilotEl.innerHTML = marked.parse(aiResponse);
-    } else if (aiResponse) {
-        copilotEl.textContent = aiResponse;
+    // --- Vibration Card ---
+    const vibeStatus = document.getElementById('vibeStatus');
+    const noiseRoll = document.getElementById('noiseRoll');
+    const noisePitch = document.getElementById('noisePitch');
+    const noiseYaw = document.getElementById('noiseYaw');
+    if (noiseRoll) noiseRoll.textContent = summary.dominantNoiseHz?.roll ? `${summary.dominantNoiseHz.roll}Hz` : '0Hz';
+    if (noisePitch) noisePitch.textContent = summary.dominantNoiseHz?.pitch ? `${summary.dominantNoiseHz.pitch}Hz` : '0Hz';
+    if (noiseYaw) noiseYaw.textContent = summary.dominantNoiseHz?.yaw ? `${summary.dominantNoiseHz.yaw}Hz` : '0Hz';
+    if (vibeStatus) {
+        vibeStatus.className = 'vibe-indicator';
+        if (aiData && aiData.vibrationHealth) {
+            vibeStatus.textContent = aiData.vibrationHealth;
+            const vt = aiData.vibrationHealth.toLowerCase();
+            if (vt.includes('severe')) vibeStatus.classList.add('vibe-severe');
+            else if (vt.includes('moderate')) vibeStatus.classList.add('vibe-moderate');
+            else vibeStatus.classList.add('vibe-clean');
+        } else {
+            vibeStatus.textContent = 'Awaiting AI analysis...';
+            vibeStatus.classList.add('vibe-clean');
+        }
     }
 
-    reportCard.classList.remove('hidden');
+    // --- Motor Health Card + Bar Chart ---
+    const motorText = document.getElementById('motorHealthText');
+    if (motorText) motorText.textContent = aiData?.motorHealth || 'No motor data available.';
+    const motors = summary.motorAverages || [0, 0, 0, 0];
+    const maxMotor = Math.max(...motors, 1);
+    const avgMotor = motors.reduce((a, b) => a + b, 0) / motors.length || 1;
+    for (let i = 0; i < 4; i++) {
+        const bar = document.getElementById(`motorBar${i + 1}`);
+        if (!bar) continue;
+        const pct = Math.round((motors[i] / maxMotor) * 100);
+        bar.style.height = `${Math.max(pct, 5)}%`;
+        bar.className = 'motor-bar';
+        if (motors[i] > avgMotor * 1.15) bar.classList.add('bar-danger');
+        else if (motors[i] > avgMotor * 1.05) bar.classList.add('bar-warning');
+        else bar.classList.add('bar-normal');
+    }
+
+    // --- PID Tracking Card ---
+    const pidText = document.getElementById('pidPerformanceText');
+    const trackRoll = document.getElementById('trackRoll');
+    const trackPitch = document.getElementById('trackPitch');
+    if (pidText) pidText.textContent = aiData?.pidPerformance || 'No tracking data.';
+    if (trackRoll) trackRoll.textContent = summary.trackingError?.roll != null ? summary.trackingError.roll.toFixed(1) : '—';
+    if (trackPitch) trackPitch.textContent = summary.trackingError?.pitch != null ? summary.trackingError.pitch.toFixed(1) : '—';
+
+    // --- Flight Summary ---
+    const summaryText = document.getElementById('reportFlightSummary');
+    if (summaryText) {
+        if (aiData?.flightSummary) {
+            summaryText.textContent = aiData.flightSummary;
+        } else if (!aiData && aiResponseText) {
+            // Markdown fallback
+            summaryText.innerHTML = typeof marked !== 'undefined' ? marked.parse(aiResponseText) : aiResponseText;
+        } else {
+            summaryText.textContent = 'Analysis complete.';
+        }
+    }
+
+    // --- Recommended Actions ---
+    const fixesSection = document.getElementById('reportRecommendedFixes');
+    const actionCardsEl = document.getElementById('reportActionCards');
+    if (fixesSection && actionCardsEl) {
+        actionCardsEl.innerHTML = '';
+        const actions = aiData?.recommendedActions || [];
+        if (actions.length > 0) {
+            fixesSection.classList.remove('hidden');
+            actions.forEach(action => {
+                if (typeof createActionCard === 'function') {
+                    const card = createActionCard(action);
+                    actionCardsEl.appendChild(card);
+                } else {
+                    // Fallback if createActionCard doesn't exist
+                    const div = document.createElement('div');
+                    div.className = 'action-card';
+                    div.innerHTML = `
+                        <div class="action-title">${action.intent || ''}</div>
+                        <div class="action-summary">${action.summary || ''}</div>
+                        <pre class="action-cli">${(action.commands || []).join('\n')}</pre>
+                    `;
+                    actionCardsEl.appendChild(div);
+                }
+            });
+        } else {
+            fixesSection.classList.add('hidden');
+        }
+    }
+
+    dashboard.classList.remove('hidden');
 }
 
 function wireBlackboxAnalyzer() {
@@ -2465,41 +2749,21 @@ function wireBlackboxAnalyzer() {
     const step1 = document.getElementById('bbStep1');
     const step2 = document.getElementById('bbStep2');
     const step3 = document.getElementById('bbStep3');
-    const reportCard = document.getElementById('blackboxReport');
+    const dashboard = document.getElementById('blackboxReportDashboard');
 
     if (!dropzone || !fileInput || !window.BlackboxParser) return;
 
-    function setProgress(pct, activeStep) {
-        if (progressBar) progressBar.style.width = pct + '%';
-        [step1, step2, step3].forEach((el, i) => {
-            if (!el) return;
-            el.classList.remove('active', 'done');
-            if (i < activeStep) el.classList.add('done');
-            else if (i === activeStep) el.classList.add('active');
+    // "Close Report" button
+    const closeBtn = document.getElementById('btnCloseReport');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            if (dashboard) dashboard.classList.add('hidden');
+            if (progress) progress.classList.add('hidden');
         });
     }
 
-    function reset() {
-        if (progress) progress.classList.add('hidden');
-        if (reportCard) reportCard.classList.add('hidden');
-    }
-
-    dropzone.addEventListener('click', () => fileInput.click());
-    dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
-    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
-    dropzone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropzone.classList.remove('dragover');
-        const file = e.dataTransfer?.files?.[0];
-        if (file) runAnalysis(file);
-    });
-    fileInput.addEventListener('change', (e) => {
-        const file = e.target.files?.[0];
-        if (file) runAnalysis(file);
-        e.target.value = '';
-    });
-
-    async function runAnalysis(file) {
+    // Attach runAnalysis to global window so accessDroneLogs can use it
+    window.runAnalysis = async function (file) {
         reset();
         if (progress) progress.classList.remove('hidden');
         setProgress(10, 0);
@@ -2509,7 +2773,7 @@ function wireBlackboxAnalyzer() {
             if (!summary) throw new Error('Could not parse log.');
             setProgress(70, 1);
 
-            if (summary.message) {
+            if (summary.message && summary.bflParsed === false) {
                 renderBlackboxReport(summary, summary.message);
                 setProgress(100, 2);
                 return;
@@ -2527,7 +2791,30 @@ function wireBlackboxAnalyzer() {
             reset();
         }
     }
+
+    function setProgress(pct, activeStep) {
+        if (progressBar) progressBar.style.width = pct + '%';
+        [step1, step2, step3].forEach((el, i) => {
+            if (!el) return;
+            el.classList.remove('active', 'done');
+            if (i < activeStep) el.classList.add('done');
+            else if (i === activeStep) el.classList.add('active');
+        });
+    }
+
+    function reset() {
+        if (progress) progress.classList.add('hidden');
+        if (dashboard) dashboard.classList.add('hidden');
+    }
+
+    dropzone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files?.[0];
+        if (file) window.runAnalysis(file);
+        e.target.value = '';
+    });
 }
+
 
 // ---------------------------------------------------------
 // Mass Storage Controller Trigger
