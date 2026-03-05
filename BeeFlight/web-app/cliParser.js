@@ -138,22 +138,36 @@ class CliParser {
             42: 'GPS RESCUE'
         };
 
-        // Regex to match: aux [modeId] [channelIndex] [minRange] [maxRange] ...
-        const auxRegex = /^aux\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/;
+        // Regex to match: aux [linkId] [modeId] [channelIndex] [minRange] [maxRange] ...
+        const auxRegex = /^aux\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/;
 
         lines.forEach(line => {
             const match = line.trim().match(auxRegex);
             if (match) {
-                const modeId = parseInt(match[1], 10);
-                const channelIndex = parseInt(match[2], 10);
-                const minRange = parseInt(match[3], 10);
-                const maxRange = parseInt(match[4], 10);
+                // Betaflight 4.x typical format: aux 0 0 2 1300 1700 0 0
+                // match[1] = linkId, match[2] = modeId, match[3] = channelIndex
+                const modeId = parseInt(match[2], 10);
+                const channelIndex = parseInt(match[3], 10);
+                const minRange = parseInt(match[4], 10);
+                const maxRange = parseInt(match[5], 10);
+
+                // Filter out disabled/unused modes (Betaflight sets these to 900 900 or 1000 1000)
+                if (minRange === maxRange || minRange > 2100 || maxRange < 900) {
+                    return; // Skip this line, mode is inactive
+                }
+
+                // Prevent duplicate mode cards if the user has multiple links for the same mode
+                // For the basic UI, we just render the first active link we find.
+                if (modes.some(m => m.modeId === modeId)) {
+                    return;
+                }
 
                 const modeName = MODE_NAMES[modeId] || `MODE ${modeId}`;
                 const channelName = `AUX ${channelIndex + 1}`;
 
                 modes.push({
                     modeId,
+                    linkId: parseInt(match[1], 10),
                     modeName,
                     channelIndex, // 0-based for array mapping
                     channelName,

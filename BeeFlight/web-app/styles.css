@@ -52,15 +52,35 @@ body {
 
 .dashboard-panel {
     flex: 1;
-    /* Left/Center takes more space */
-    border-right: 1px solid var(--border-subtle);
+    /* Center area stretches */
+    min-width: 0;
+    /* Prevents flex items from resisting shrink if tables get wide */
     background-color: var(--bg-app);
 }
 
+.splitter {
+    width: 6px;
+    background-color: transparent;
+    cursor: col-resize;
+    transition: background-color 0.2s;
+    user-select: none;
+    z-index: 100;
+}
+
+.splitter:hover,
+.splitter.dragging {
+    background-color: var(--accent-blue);
+}
+
 .copilot-panel {
-    flex: 0 0 400px;
-    /* Fixed width for chat */
+    flex-basis: 350px;
+    /* Default starting width */
+    max-width: 600px;
+    min-width: 300px;
     background-color: var(--bg-panel);
+    border-left: 1px solid var(--border-subtle);
+    display: flex;
+    flex-direction: column;
 }
 
 .panel-header {

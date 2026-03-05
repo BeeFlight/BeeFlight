@@ -401,7 +401,33 @@
                         </div> <!-- End View Receiver -->
                         <!-- MODES TAB -->
                         <div id="view-modes" class="tab-view">
-                            <h2 class="tab-title">Active Modes</h2>
+                            <div class="modes-header-row">
+                                <h2 class="tab-title">Active Modes</h2>
+                                <div class="add-mode-container">
+                                    <button id="btnAddMode" class="btn-add-mode">+ Add Mode</button>
+                                    <div id="addModeDropdown" class="add-mode-dropdown hidden">
+                                        <div class="dropdown-category">Core Flight</div>
+                                        <div class="dropdown-item" data-mode-id="0" data-mode-name="ARM">ARM</div>
+                                        <div class="dropdown-item" data-mode-id="1" data-mode-name="ANGLE">ANGLE</div>
+                                        <div class="dropdown-item" data-mode-id="2" data-mode-name="HORIZON">HORIZON
+                                        </div>
+                                        <div class="dropdown-category">Safety & Recovery</div>
+                                        <div class="dropdown-item" data-mode-id="39" data-mode-name="PREARM">PREARM
+                                        </div>
+                                        <div class="dropdown-item" data-mode-id="35"
+                                            data-mode-name="FLIP OVER AFTER CRASH">TURTLE MODE</div>
+                                        <div class="dropdown-item" data-mode-id="13" data-mode-name="BEEPERON">BEEPER
+                                        </div>
+                                        <div class="dropdown-item" data-mode-id="27" data-mode-name="FAILSAFE">FAILSAFE
+                                        </div>
+                                        <div class="dropdown-category">Advanced</div>
+                                        <div class="dropdown-item" data-mode-id="26" data-mode-name="BLACKBOX">BLACKBOX
+                                        </div>
+                                        <div class="dropdown-item" data-mode-id="28" data-mode-name="AIRMODE">AIRMODE
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="modes-container">
                                 <div id="modesGrid" class="modes-grid">
                                     <div class="mode-item placeholder">Waiting for CLI Sync...</div>
@@ -847,8 +873,10 @@
 
                 <!-- Hidden E-Stop for future QA requirements -->
                 <button id="emergencyStopBtn" class="btn-danger hidden">EMERGENCY STOP</button>
-            </div>
         </main>
+
+        <!-- Resizable Splitter -->
+        <div id="copilot-splitter" class="splitter"></div>
 
         <!-- Right Panel: AI Copilot -->
         <aside class="panel copilot-panel">

@@ -358,22 +358,23 @@ function uiUpdateLoop() {
 
     const modesView = document.getElementById('view-modes');
     if (modesView && modesView.classList.contains('active')) {
-        // Modes Tab Updates (Evaluate live RC aux against parsed mode ranges)
-        const activeModes = droneState.live.rc.aux;
+        // Modes Tab Live Slider Updates
+        const activeAux = droneState.live.rc.aux;
         if (window.parsedModes && window.parsedModes.length > 0) {
             window.parsedModes.forEach(mode => {
                 const card = document.getElementById(`modeCard-${mode.modeId}`);
                 if (card) {
-                    const currentPwm = activeModes[mode.channelIndex] || 1500;
+                    const currentPwm = activeAux[mode.channelIndex] || 1500;
                     const isActive = currentPwm >= mode.minRange && currentPwm <= mode.maxRange;
 
-                    if (isActive) {
-                        card.classList.add('active');
-                        // Add safety warning if ARM is active on bench
-                        if (mode.modeId === 0) card.classList.add('arm-warning');
-                    } else {
-                        card.classList.remove('active');
-                        if (mode.modeId === 0) card.classList.remove('arm-warning');
+                    if (isActive) card.classList.add('active');
+                    else card.classList.remove('active');
+
+                    // Move local slider indicator
+                    const indicator = document.getElementById(`indicator-${mode.modeId}`);
+                    if (indicator) {
+                        const pct = Math.max(0, Math.min(100, ((currentPwm - 900) / 1200) * 100));
+                        indicator.style.left = `${pct}%`;
                     }
                 }
             });
@@ -745,6 +746,11 @@ ${droneState.cliDiff || '(Not yet synced — CLI diff has not been captured yet.
 - SLOW FLIPS/ROLLS: If the user complains that flips, rolls, or rotations feel too slow or take too long, suggest an Action Card that increases roll_srate and pitch_srate by ~5-10. If super rate is already above 80, warn about potential loss of control.
 - INDOOR / TIGHT SPACES: If the user mentions flying indoors, hitting the ceiling, struggling through doors or windows, or flying a Whoop, suggest the 'Indoor' rate profile (RC Rate: 0.7, Super Rate: 0.55, Expo: 0.60). Explain that setting Expo to 0.60 deeply flattens the center stick response, giving much finer micro-movement control in tight quarters while still allowing full rotation at max deflection.
 - SAFETY D-TERM LIMIT: Never increase d_roll/d_pitch/d_yaw by more than 5 points at a time. If already above 50, recommend reductions.
+- AUDIT_MODES: When the user asks "How are my modes looking?" or to audit their switches, analyze the 'aux' commands in the CLI Diff. Apply these 3 Safety Checks: 
+    1. If ARM (modeId 0) is assigned but PREARM (modeId 39) is missing, gently suggest adding PREARM to prevent accidental throttle-up.
+    2. If FLIP OVER AFTER CRASH (modeId 35, Turtle Mode) is missing, warn them they will have to perform the 'walk of shame' if they crash upside down.
+    3. Ensure the active range (min to max) for ARM (modeId 0) does NOT overlap with dangerous modes like FAILSAFE (modeId 27). 
+    Output your recommendations as a standard JSON Action Card with the appropriate "aux" CLI commands.
 
 ## ACTION FORMAT
 When the user asks you to change a configuration setting (PIDs, rates, filters, VTX, Blackbox, OSD, etc.), you MUST respond with a structured JSON block wrapped in a fenced code block annotated as \`\`\`action (no other markdown). The JSON MUST have this shape:
@@ -1297,9 +1303,11 @@ navigator.serial.addEventListener('connect', async (event) => {
                 });
 
                 if (matchedPort) {
-                    port = matchedPort;
-                    await port.open({ baudRate: 115200 });
-                    droneState.connected = true;
+                    if (targetMode) {
+                        // Flash the new setting!
+                        // Ensure we pass the precise linkId tied to this mode card
+                        await updateModeLinkCli(targetMode.linkId, modeId, i, minBound, maxBound);
+                    } droneState.connected = true;
                     connectionStatus.textContent = "Auto-Reconnected!";
                     connectionStatus.style.color = "var(--status-success)";
                     connectionStatus.style.background = "rgba(16,185,129,0.1)";
@@ -1843,44 +1851,351 @@ function renderPortsTab() {
 // ---------------------------------------------------------
 // Modes Tab Rendering
 // ---------------------------------------------------------
-// Store parsed modes globally so the hot loop can access them
+// ---------------------------------------------------------
+// Modes Tab Overhaul (Phase 5)
+// ---------------------------------------------------------
 window.parsedModes = [];
+let autoDetectActive = false;
+let autoDetectInterval = null;
+let currentAutoDetectModeId = null;
+let baselineRc = null;
 
 function renderModesTab() {
     const modesGrid = document.getElementById('modesGrid');
     if (!modesGrid) return;
 
-    // Clear placeholder
     modesGrid.innerHTML = '';
+
+    // Handle initial state or missing CLI
+    if (!droneState.cliDiff) {
+        modesGrid.innerHTML = `<div class="mode-item placeholder" style="grid-column: 1 / -1; text-align: center; padding: 40px;">Waiting for CLI Sync...</div>`;
+        return;
+    }
 
     window.parsedModes = window.CliParser.parseModes(droneState.cliDiff);
 
     if (!window.parsedModes || window.parsedModes.length === 0) {
         modesGrid.innerHTML = `<div class="mode-item placeholder" style="grid-column: 1 / -1; text-align: center; padding: 40px;">
-                                No modes configured. Ask the AI Copilot to set up your Arm and Flight Mode switches.
+                                No modes configured. Click "+ Add Mode" to begin.
                                </div>`;
         return;
     }
 
+    // Helper: Map channel names to AUX indices (AUX 1 = index 0)
+    const channelOptions = [
+        { val: 0, text: 'AUX 1' }, { val: 1, text: 'AUX 2' },
+        { val: 2, text: 'AUX 3' }, { val: 3, text: 'AUX 4' },
+        { val: 4, text: 'AUX 5' }, { val: 5, text: 'AUX 6' }
+    ];
+
     window.parsedModes.forEach(mode => {
         const card = document.createElement('div');
-        // mode.modeId = 0 is ARM
-        card.className = `mode-card ${mode.modeId === 0 ? 'mode-arm' : ''}`;
+        card.className = `mode-card-modern ${mode.modeId === 0 ? 'mode-arm' : ''}`;
         card.id = `modeCard-${mode.modeId}`;
 
-        const nameEl = document.createElement('div');
-        nameEl.className = 'mode-name';
-        nameEl.textContent = mode.modeName;
+        // Build Dropdown Options
+        let optionsHtml = '';
+        channelOptions.forEach(opt => {
+            // mode.channelIndex represents standard AUX index (0-based)
+            // But Betaflight CLI uses 0 for AUX1, 1 for AUX2, etc. in mode links.
+            const selected = (mode.channelIndex === opt.val) ? 'selected' : '';
+            optionsHtml += `<option value="${opt.val}" ${selected}>${opt.text}</option>`;
+        });
 
-        const chanEl = document.createElement('div');
-        chanEl.className = 'mode-channel';
-        chanEl.textContent = `Switch: ${mode.channelName}`;
+        // Map Betaflight's 900-2100 logic to percentages for the slider UI
+        const rangeMinPct = ((mode.minRange - 900) / 1200) * 100;
+        const rangeWidthPct = ((mode.maxRange - mode.minRange) / 1200) * 100;
 
-        card.appendChild(nameEl);
-        card.appendChild(chanEl);
+        card.innerHTML = `
+            <div class="mode-info-block">
+                <div class="mode-title-modern">${mode.modeName}</div>
+                <div class="mode-controls">
+                    <select class="mode-channel-select" id="modeSelect-${mode.modeId}">
+                        ${optionsHtml}
+                    </select>
+                    <button class="btn-auto-detect" id="btnAuto-${mode.modeId}">🎧 Auto-Detect</button>
+                    ${mode.modeId !== 0 ? `<button class="mode-delete-btn" id="btnDelMode-${mode.modeId}" title="Delete Mode">×</button>` : ''}
+                </div>
+            </div>
+            <div class="mode-slider-block" data-mode-id="${mode.modeId}">
+                <div class="mode-slider-track" id="track-${mode.modeId}">
+                    <div class="mode-slider-range" id="range-${mode.modeId}" style="left: ${Math.max(0, rangeMinPct)}%; width: ${Math.min(100, rangeWidthPct)}%;">
+                        <div class="slider-drag-handle left-handle" data-side="min"></div>
+                        <div class="slider-drag-handle right-handle" data-side="max"></div>
+                    </div>
+                    <div class="mode-slider-indicator" id="indicator-${mode.modeId}" style="left: 50%;"></div>
+                </div>
+                <div class="mode-slider-labels">
+                    <span>900</span>
+                    <span>1500</span>
+                    <span>2100</span>
+                </div>
+            </div>
+        `;
+
         modesGrid.appendChild(card);
+
+        // Wire Auto-Detect
+        const btnAuto = card.querySelector(`#btnAuto-${mode.modeId}`);
+        if (btnAuto) {
+            btnAuto.addEventListener('click', () => {
+                if (autoDetectActive) stopAutoDetect(); // Stop any exact one
+                startAutoDetect(mode.modeId, btnAuto);
+            });
+        }
+
+        // Wire Delete
+        const btnDel = card.querySelector(`#btnDelMode-${mode.modeId}`);
+        if (btnDel) {
+            btnDel.addEventListener('click', async () => {
+                const isConfirmed = confirm(`Are you sure you want to delete the ${mode.modeName} mode link?`);
+                if (!isConfirmed) return;
+                try {
+                    btnDel.disabled = true;
+                    // To delete a mode link, we just override it with an unused link (e.g. range 900-900)
+                    // Or we remove it if using modern BF syntax, but setting safe tight range is universal.
+                    // Better yet, standard betaflight lets us free the mode by removing the line
+                    // But through CLI diff injection, best to omit it and let parser handle, or set zero bounds.
+                    // The safest CLI way to kill a mode link is setting bounds outside standard range
+                    await restoreCliData(`\nmode_color 0 0 0\naux ${mode.modeId} 0 0 900 900 0\nsave\n`);
+                } catch (e) { log.error("Delete mode failed", e); }
+            });
+        }
+
+        // Wire Manual Channel Select
+        const selChan = card.querySelector(`#modeSelect-${mode.modeId}`);
+        if (selChan) {
+            selChan.addEventListener('change', async () => {
+                const newAux = parseInt(selChan.value, 10);
+                await updateModeLinkCli(mode.linkId, mode.modeId, newAux, mode.minRange, mode.maxRange);
+            });
+        }
+
+        // Wire Slider Drag Logic
+        const track = card.querySelector(`#track-${mode.modeId}`);
+        const rangeBox = card.querySelector(`#range-${mode.modeId}`);
+        const handles = card.querySelectorAll('.slider-drag-handle');
+
+        let isDragging = false;
+        let activeHandle = null;
+        let pMin = mode.minRange;
+        let pMax = mode.maxRange;
+
+        handles.forEach(handle => {
+            handle.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                activeHandle = handle.dataset.side;
+                document.body.style.cursor = 'ew-resize';
+                e.stopPropagation();
+                e.preventDefault();
+            });
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging || !track) return;
+            const rect = track.getBoundingClientRect();
+            let pct = (e.clientX - rect.left) / rect.width;
+            pct = Math.max(0, Math.min(1, pct));
+            let val = Math.round(900 + (pct * 1200));
+
+            // Constrain & snap cleanly like BF (25 points)
+            val = Math.round(val / 25) * 25;
+
+            if (activeHandle === 'min') {
+                pMin = Math.min(val, pMax - 25);
+            } else {
+                pMax = Math.max(val, pMin + 25);
+            }
+
+            // Update UI visually instantly
+            const pMinPct = ((pMin - 900) / 1200) * 100;
+            const pWidthPct = ((pMax - pMin) / 1200) * 100;
+            rangeBox.style.left = `${pMinPct}%`;
+            rangeBox.style.width = `${pWidthPct}%`;
+        });
+
+        document.addEventListener('mouseup', async () => {
+            if (isDragging) {
+                isDragging = false;
+                document.body.style.cursor = 'default';
+
+                // Only save and flash if bounds truly mutated
+                if (pMin !== mode.minRange || pMax !== mode.maxRange) {
+                    const selAux = parseInt(selChan.value, 10);
+                    mode.minRange = pMin;
+                    mode.maxRange = pMax;
+                    await updateModeLinkCli(mode.linkId, mode.modeId, selAux, pMin, pMax);
+                }
+            }
+        });
+    });
+
+    // Wire up Add Mode Dropdown
+    const btnAddMode = document.getElementById('btnAddMode');
+    const addModeDropdown = document.getElementById('addModeDropdown');
+
+    if (btnAddMode && addModeDropdown) {
+        // Remove old listeners to prevent stacking
+        const newBtnAddMode = btnAddMode.cloneNode(true);
+        btnAddMode.parentNode.replaceChild(newBtnAddMode, btnAddMode);
+
+        newBtnAddMode.addEventListener('click', (e) => {
+            e.stopPropagation();
+            addModeDropdown.classList.toggle('hidden');
+        });
+
+        // Close when clicking outside
+        document.addEventListener('click', () => addModeDropdown.classList.add('hidden'), { once: true });
+
+        // Wire dropdown items
+        addModeDropdown.querySelectorAll('.dropdown-item').forEach(item => {
+            item.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                addModeDropdown.classList.add('hidden');
+                const mId = parseInt(item.getAttribute('data-mode-id'));
+                const mName = item.getAttribute('data-mode-name');
+
+                // Check if already exists in active bounds
+                if (window.parsedModes.find(m => m.modeId === mId)) {
+                    alert(`${mName} is already active.`);
+                    return;
+                }
+
+                // Find first available linkId (0-40 usually allowed)
+                const usedLinkIds = window.parsedModes.map(m => m.linkId);
+                let nextLinkId = 0;
+                while (usedLinkIds.includes(nextLinkId)) {
+                    nextLinkId++;
+                }
+
+                // Inject default safe link: AUX1, 1300-1700
+                const cmds = `aux ${nextLinkId} ${mId} 0 1300 1700 0\nsave\n`;
+                const btnOriginalText = newBtnAddMode.textContent;
+                newBtnAddMode.textContent = '⏳ Adding...';
+                try {
+                    await restoreCliData(cmds);
+                } catch (err) {
+                    log.error('Add mode failed', err);
+                } finally {
+                    newBtnAddMode.textContent = btnOriginalText;
+                }
+            });
+        });
+    }
+}
+
+// Write the compiled mode link to the drone
+async function updateModeLinkCli(linkId, modeId, auxIndex, minBound, maxBound) {
+    // Mode format: aux <linkId> <modeId> <auxChannel> <min> <max> <reserved>
+    const cmds = `aux ${linkId} ${modeId} ${auxIndex} ${minBound} ${maxBound} 0\nsave\n`;
+    try {
+        await restoreCliData(cmds);
+    } catch (e) {
+        log.error("Failed to update mode link", e);
+    }
+}
+
+// ---------------------------------------------------------
+// Auto-Detect Switch Logic
+// ---------------------------------------------------------
+async function startAutoDetect(modeId, btnElement) {
+    if (!droneState.connected || !serialPort) {
+        alert("Drone not connected for Auto-Detect.");
+        return;
+    }
+
+    autoDetectActive = true;
+    currentAutoDetectModeId = modeId;
+    btnElement.classList.add('listening');
+    btnElement.textContent = "🎧 Listening...";
+
+    // Get a baseline of where the switches are right now
+    baselineRc = await fetchRcData();
+    if (!baselineRc) {
+        stopAutoDetect();
+        return;
+    }
+
+    // Poll rapidly
+    autoDetectInterval = setInterval(async () => {
+        const liveRc = await fetchRcData();
+        if (!liveRc) return;
+
+        // Compare AUX channels against baseline
+        for (let i = 0; i < liveRc.aux.length; i++) {
+            const baselineVal = baselineRc.aux[i];
+            const liveVal = liveRc.aux[i];
+            const delta = Math.abs(liveVal - baselineVal);
+
+            // If a switch moved by more than 300 points
+            if (delta > 300) {
+                stopAutoDetect(); // Got a hit!
+
+                // Determine the new "active range" for this physical position
+                // e.g., if switch snapped to 2000, active range should wrap it (~1700 to 2100)
+                // if switch snapped to 1000, wrap (~900 to 1300)
+                // if switch snapped to 1500, wrap (~1300 to 1700)
+
+                let bouncePadding = 150; // padding around the exact value
+                let newMin = Math.max(900, liveVal - bouncePadding);
+                let newMax = Math.min(2100, liveVal + bouncePadding);
+
+                // Round to clean 100s if close
+                if (newMin < 1000) newMin = 900;
+                if (newMax > 2000) newMax = 2100;
+
+                btnElement.classList.remove('listening');
+                btnElement.textContent = "✅ Snapped!";
+
+                // Immediately flash the calculated range and channel to the FC
+                const targetMode = window.parsedModes.find(m => m.modeId === modeId);
+                if (targetMode) {
+                    await updateModeLinkCli(targetMode.linkId, modeId, i, newMin, newMax);
+                }
+
+                setTimeout(() => {
+                    if (btnElement) btnElement.textContent = "🎧 Auto-Detect";
+                }, 2000);
+
+                return;
+            }
+        }
+    }, 50); // Poll every 50ms for snappy feel
+}
+
+function stopAutoDetect() {
+    autoDetectActive = false;
+    currentAutoDetectModeId = null;
+    if (autoDetectInterval) {
+        clearInterval(autoDetectInterval);
+        autoDetectInterval = null;
+    }
+    // Clean up stranded button states
+    document.querySelectorAll('.btn-auto-detect.listening').forEach(b => {
+        b.classList.remove('listening');
+        b.textContent = "🎧 Auto-Detect";
     });
 }
+
+// Manually fetch a single MSP_RC frame
+async function fetchRcData() {
+    try {
+        // Send request
+        const req = MSP.encode(MSP.MSP_RC);
+        const writer = serialPort.writable.getWriter();
+        await writer.write(req);
+        writer.releaseLock();
+
+        // Let the global loop process it, we just steal the latest from a global state if we track it.
+        // Or wait slightly and grab droneState.rc
+        // For standard async flow, we rely on the main loop having updated droneState.rc
+        await new Promise(r => setTimeout(r, 20)); // wait for response
+        return droneState.rc;
+    } catch (e) {
+        return droneState.rc; // fallback to last known
+    }
+}
+
 
 // ---------------------------------------------------------
 // Power Tab Rendering
@@ -3080,3 +3395,54 @@ aux 1 1 900 1200 0 0
         });
     }
 };
+
+// ---------------------------------------------------------
+// Layout: Resizable Copilot Splitter
+// ---------------------------------------------------------
+const copilotSplitter = document.getElementById('copilot-splitter');
+const copilotPanel = document.querySelector('.copilot-panel');
+
+if (copilotSplitter && copilotPanel) {
+    let isSplitterDragging = false;
+    let startX;
+    let startWidth;
+
+    copilotSplitter.addEventListener('mousedown', (e) => {
+        isSplitterDragging = true;
+        startX = e.clientX;
+        // Get precise computed width before dragging starts
+        startWidth = copilotPanel.getBoundingClientRect().width;
+
+        copilotSplitter.classList.add('dragging');
+        document.body.style.cursor = 'col-resize';
+        // Prevent accidental text selection while dragging
+        document.body.style.userSelect = 'none';
+
+        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isSplitterDragging) return;
+
+        // Since panel is on the right, moving mouse left (negative delta) increases width
+        const dx = startX - e.clientX;
+        let newWidth = startWidth + dx;
+
+        // Enforce bounds (matches CSS constraints)
+        if (newWidth < 300) newWidth = 300;
+        if (newWidth > 600) newWidth = 600;
+
+        // Apply via flex-basis so layout flex engines respect it
+        copilotPanel.style.flexBasis = `${newWidth}px`;
+        copilotPanel.style.width = `${newWidth}px`; // ensure absolute width is recognized by children
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (isSplitterDragging) {
+            isSplitterDragging = false;
+            copilotSplitter.classList.remove('dragging');
+            document.body.style.cursor = 'default';
+            document.body.style.userSelect = 'auto'; // restore selection
+        }
+    });
+}
