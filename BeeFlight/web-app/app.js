@@ -2447,12 +2447,12 @@ async function fetchRcData() {
         writer.releaseLock();
 
         // Let the global loop process it, we just steal the latest from a global state if we track it.
-        // Or wait slightly and grab droneState.rc
-        // For standard async flow, we rely on the main loop having updated droneState.rc
+        // Or wait slightly and grab droneState.live.rc
+        // For standard async flow, we rely on the main loop having updated droneState.live.rc
         await new Promise(r => setTimeout(r, 20)); // wait for response
-        return droneState.rc;
+        return droneState.live.rc;
     } catch (e) {
-        return droneState.rc; // fallback to last known
+        return droneState.live?.rc || null; // fallback to last known
     }
 }
 
