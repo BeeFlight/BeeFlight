@@ -2228,6 +2228,108 @@ function renderModesTab() {
             });
         });
     }
+
+    // Wire up Export / Import Mode Layouts
+    const btnSaveModeLayout = document.getElementById('btnSaveModeLayout');
+    const btnLoadModeLayout = document.getElementById('btnLoadModeLayout');
+    const modeLayoutFileInput = document.getElementById('modeLayoutFileInput');
+
+    if (btnSaveModeLayout) {
+        // Cloning prevents duplicate event listeners if renderModesTab runs multiple times
+        const newBtnSave = btnSaveModeLayout.cloneNode(true);
+        btnSaveModeLayout.parentNode.replaceChild(newBtnSave, btnSaveModeLayout);
+
+        newBtnSave.addEventListener('click', () => {
+            if (!window.parsedModes || window.parsedModes.length === 0) {
+                alert("No active modes to save.");
+                return;
+            }
+
+            const payload = {
+                templateName: "BeeFlight Modes Layout",
+                exportedAt: new Date().toISOString(),
+                modes: window.parsedModes.map(m => ({
+                    modeId: m.modeId,
+                    modeName: m.modeName,
+                    channelIndex: m.channelIndex,
+                    minRange: m.minRange,
+                    maxRange: m.maxRange
+                }))
+            };
+
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `beeflight-modes-${new Date().toISOString().slice(0, 10)}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showToast('Mode Layout Exported Successfully', 'success');
+        });
+    }
+
+    if (btnLoadModeLayout && modeLayoutFileInput) {
+        const newBtnLoad = btnLoadModeLayout.cloneNode(true);
+        btnLoadModeLayout.parentNode.replaceChild(newBtnLoad, btnLoadModeLayout);
+
+        const newFileInput = modeLayoutFileInput.cloneNode(true);
+        modeLayoutFileInput.parentNode.replaceChild(newFileInput, modeLayoutFileInput);
+
+        newBtnLoad.addEventListener('click', () => {
+            newFileInput.click();
+        });
+
+        newFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                try {
+                    const data = JSON.parse(evt.target.result);
+                    if (!data.modes || !Array.isArray(data.modes)) {
+                        throw new Error("Invalid format: Missing 'modes' array.");
+                    }
+
+                    // Build CLI commands to clear and apply the new layout
+                    let cliCommands = "mode_color 0 0 0\n";
+                    let newLinkId = 0;
+
+                    for (const m of data.modes) {
+                        // mode format: aux <link_id> <mode_id> <aux_index> <min> <max> 0
+                        cliCommands += `aux ${newLinkId} ${m.modeId} ${m.channelIndex} ${m.minRange} ${m.maxRange} 0\n`;
+                        newLinkId++;
+                    }
+                    cliCommands += "save\n";
+
+                    // Push the action card to the AI Copilot to safely flash
+                    const messageId = `msg-${Date.now()}`;
+                    window.appendChatMessage(`I want to import the mode layout from **${file.name}**.`, 'user');
+
+                    const responseHtml = `
+                        <p>I have processed the <strong>${data.templateName || 'Custom'}</strong> layout template.</p>
+                        <p>This layout contains <strong>${data.modes.length}</strong> mode assignments.</p>
+                        <p>Review the commands below and click <strong>Approve & Flash</strong> to apply them to your flight controller.</p>
+                    `;
+
+                    window.renderAiResponse({
+                        text: responseHtml,
+                        commands: cliCommands
+                    }, messageId);
+
+                } catch (err) {
+                    log.error("Failed to parse mode layout JSON", err);
+                    alert("Error parsing file. Please ensure it is a valid BeeFlight Modes JSON template.");
+                } finally {
+                    newFileInput.value = ''; // Reset for next use
+                }
+            };
+            reader.readAsText(file);
+        });
+    }
 }
 
 // Write the compiled mode link to the drone
@@ -2253,7 +2355,7 @@ async function startAutoDetect(modeId, btnElement) {
     autoDetectActive = true;
     currentAutoDetectModeId = modeId;
     btnElement.classList.add('listening');
-    btnElement.textContent = "🎧 Listening...";
+    btnElement.textContent = "🔴 Listening...";
 
     // Get a baseline of where the switches are right now
     baselineRc = await fetchRcData();
@@ -2273,15 +2375,11 @@ async function startAutoDetect(modeId, btnElement) {
             const liveVal = liveRc.aux[i];
             const delta = Math.abs(liveVal - baselineVal);
 
-            // If a switch moved by more than 300 points
-            if (delta > 300) {
+            // If a switch moved by more than 200 points
+            if (delta > 200) {
                 stopAutoDetect(); // Got a hit!
 
                 // Determine the new "active range" for this physical position
-                // e.g., if switch snapped to 2000, active range should wrap it (~1700 to 2100)
-                // if switch snapped to 1000, wrap (~900 to 1300)
-                // if switch snapped to 1500, wrap (~1300 to 1700)
-
                 let bouncePadding = 150; // padding around the exact value
                 let newMin = Math.max(900, liveVal - bouncePadding);
                 let newMax = Math.min(2100, liveVal + bouncePadding);
@@ -2293,9 +2391,25 @@ async function startAutoDetect(modeId, btnElement) {
                 btnElement.classList.remove('listening');
                 btnElement.textContent = "✅ Snapped!";
 
+                // UI Resolution: Update Dropdown to match the detected channel
+                const selChan = document.querySelector(`#modeSelect-${modeId}`);
+                if (selChan) selChan.value = i;
+
+                // UI Resolution: Update Slider UI visually instantly
+                const rangeBox = document.querySelector(`#range-${modeId}`);
+                if (rangeBox) {
+                    const pMinPct = ((newMin - 900) / 1200) * 100;
+                    const pWidthPct = ((newMax - newMin) / 1200) * 100;
+                    rangeBox.style.left = `${pMinPct}%`;
+                    rangeBox.style.width = `${pWidthPct}%`;
+                }
+
                 // Immediately flash the calculated range and channel to the FC
                 const targetMode = window.parsedModes.find(m => m.modeId === modeId);
                 if (targetMode) {
+                    targetMode.minRange = newMin;
+                    targetMode.maxRange = newMax;
+                    targetMode.channelIndex = i; // Save new mapping locally
                     await updateModeLinkCli(targetMode.linkId, modeId, i, newMin, newMax);
                 }
 

@@ -403,7 +403,12 @@
                         <div id="view-modes" class="tab-view">
                             <div class="modes-header-row">
                                 <h2 class="tab-title">Active Modes</h2>
-                                <div class="add-mode-container">
+                                <div class="add-mode-container" style="display: flex; gap: 8px;">
+                                    <button id="btnSaveModeLayout" class="btn-secondary" title="Export Layout">⬇️ Save
+                                        Layout</button>
+                                    <button id="btnLoadModeLayout" class="btn-secondary" title="Import Layout">⬆️ Load
+                                        Layout</button>
+                                    <input type="file" id="modeLayoutFileInput" accept=".json" class="hidden">
                                     <button id="btnAddMode" class="btn-add-mode">+ Add Mode</button>
                                     <div id="addModeDropdown" class="add-mode-dropdown hidden">
                                         <div class="dropdown-category">Core Flight</div>
