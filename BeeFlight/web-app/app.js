@@ -1396,14 +1396,39 @@ async function captureCliDiff() {
 // Web Serial Connection (Two-phase: CLI first, then MSP)
 // ---------------------------------------------------------
 
-navigator.serial.addEventListener('disconnect', (event) => {
+navigator.serial.addEventListener('disconnect', async (event) => {
     if (event.target === port || !port) {
         log.info('USB Disconnect event: FC dropped connection');
+
+        // ---- VIOLENT TEARDOWN (Graceful Hardware Reboot Lifecycle) ----
+        if (isRebooting) {
+            const rebootOverlay = document.getElementById('rebootOverlay');
+            if (rebootOverlay) {
+                rebootOverlay.classList.remove('hidden');
+                rebootOverlay.classList.add('active');
+            }
+
+            try {
+                if (reader) {
+                    await reader.cancel();
+                    reader.releaseLock();
+                }
+            } catch (e) { }
+            try { if (writer) writer.releaseLock(); } catch (e) { }
+            try { if (port) await port.close(); } catch (e) { }
+
+            // Clear RC intervals to stop console beg spam
+            if (typeof mspRcInterval !== 'undefined' && mspRcInterval) clearInterval(mspRcInterval);
+            if (typeof autoDetectInterval !== 'undefined' && autoDetectInterval) clearInterval(autoDetectInterval);
+
+            logToConsole('Hardware disconnected rapidly. Releasing locks.', 'warning');
+        }
+
         stopPolling();
         // Clear session history on disconnect to prevent cross-drone rollbacks
         if (window.sessionHistory) window.sessionHistory = [];
 
-        if (isReconnectingAfterCli) {
+        if (isReconnectingAfterCli || isRebooting) {
             droneState.connected = false;
         } else {
             // Auto-Reconnect scenario triggered manually or unexpectedly
@@ -1419,6 +1444,55 @@ navigator.serial.addEventListener('disconnect', (event) => {
 
 navigator.serial.addEventListener('connect', async (event) => {
     log.info('USB Connect event: FC re-enumerated');
+
+    // ---- AUTO-CATCH (Graceful Hardware Reboot Lifecycle) ----
+    if (isRebooting) {
+        isRebooting = false;
+        logToConsole('FC boot completed. Auto-catching USB...', 'info');
+
+        setTimeout(async () => {
+            try {
+                const ports = await navigator.serial.getPorts();
+                const matchedPort = ports.find(p => {
+                    const info = p.getInfo();
+                    return info.usbVendorId === connectedVid && info.usbProductId === connectedPid;
+                });
+
+                if (matchedPort) {
+                    port = matchedPort;
+                    await port.open({ baudRate: 115200 });
+
+                    droneState.connected = true;
+                    connectionStatus.textContent = "Reconnected!";
+                    connectionStatus.classList.add("connected");
+
+                    writer = port.writable.getWriter();
+                    startMspReadLoop();
+                    await initializeDrone();
+
+                    const rebootOverlay = document.getElementById('rebootOverlay');
+                    if (rebootOverlay) {
+                        rebootOverlay.classList.remove('active');
+                        setTimeout(() => rebootOverlay.classList.add('hidden'), 300);
+                    }
+                    showToast('Graceful Hardware Reboot Successful.', 'success');
+                    logToConsole('Hardware Auto-Catch seamless execution.', 'success');
+                } else {
+                    throw new Error("Port not found in previously granted devices.");
+                }
+            } catch (err) {
+                log.error('Auto-catch failed', err);
+                const rebootOverlay = document.getElementById('rebootOverlay');
+                if (rebootOverlay) {
+                    rebootOverlay.classList.remove('active');
+                    rebootOverlay.classList.add('hidden');
+                }
+                showToast('Auto-Catch failed. Please click Connect manually.', 'error');
+            }
+        }, 600); // 600ms buffer for FC Bootloader
+        return;
+    }
+
     if (isReconnectingAfterCli) {
         isReconnectingAfterCli = false;
         port = event.target;
@@ -1487,6 +1561,7 @@ navigator.serial.addEventListener('connect', async (event) => {
 let connectedVid = null;
 let connectedPid = null;
 let isReconnecting = false;
+let isRebooting = false;
 
 async function connectToDrone() {
     if (!('serial' in navigator)) {
@@ -2858,10 +2933,10 @@ async function restoreCliData(fullText) {
         }
 
         // Final save
+        isRebooting = true; // Trigger hardware teardown blockade
         await cliWriter.write(encoder.encode('save\n'));
         updateImportProgress(100);
-        logToConsole('Restore complete. FC is rebooting after save.', 'success');
-        showToast('Restore complete. Flight controller is rebooting. Reconnect to refresh state.', 'success');
+        logToConsole('Restore complete. FC is rebooting gracefully...', 'success');
     } catch (err) {
         log.error('CLI restore error', err);
         logToConsole(`CLI restore error: ${err.message}`, 'error');

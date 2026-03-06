@@ -1077,6 +1077,13 @@
     <!-- Hidden QA Test Output Container -->
     <div id="qa-test-results" class="hidden" style="display:none;"></div>
 
+    <!-- Graceful Hardware Reboot Overlay -->
+    <div id="rebootOverlay" class="reboot-overlay hidden">
+        <div class="reboot-spinner"></div>
+        <div class="reboot-text">Rebooting Flight Controller</div>
+        <div class="reboot-subtext">Waiting for USB reconnection...</div>
+    </div>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.1/marked.min.js"></script>
     <script src="https://apis.google.com/js/api.js"></script>

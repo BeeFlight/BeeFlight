@@ -2067,3 +2067,65 @@
         transform: translateY(0);
     }
 }
+
+/* ---------------------------------------------------------
+   Rebooting Overlay (Hardware Catch)
+   --------------------------------------------------------- */
+.reboot-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(15, 23, 42, 0.85);
+    /* Dark slate with opacity */
+    backdrop-filter: blur(10px);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    pointer-events: auto;
+    /* CRITICAL: Block all clicks beneath it */
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.reboot-overlay.active {
+    opacity: 1;
+}
+
+.reboot-overlay.hidden {
+    display: none;
+    pointer-events: none;
+}
+
+.reboot-spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid rgba(255, 255, 255, 0.1);
+    border-top-color: #3b82f6;
+    /* Blue highlight */
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 24px;
+}
+
+.reboot-text {
+    font-size: 1.5rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.reboot-subtext {
+    margin-top: 12px;
+    font-size: 1rem;
+    color: var(--text-muted);
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
