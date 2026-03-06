@@ -6,11 +6,6 @@
 
 **The intelligent, conversational copilot for FPV drone configuration.**
 
-<p align="center">
-  <!-- Note: Replace "docs/dashboard-preview.png" with the path or URL of your uploaded screenshot -->
-  <img src="docs/dashboard-preview.png" alt="BeeFlight AI Dashboard" width="800" style="border-radius: 8px;" />
-</p>
-
 BeeFlight AI is a modern web application that reimagines the traditional flight controller setup process. By replacing dense, spreadsheet-like tables with an AI-driven, intent-based interface, this project democratizes FPV drone building and tuning for beginners while streamlining workflows for advanced pilots.
 
 ---
@@ -20,10 +15,12 @@ BeeFlight AI is a modern web application that reimagines the traditional flight 
 Below are autoplaying demonstrations of the BeeFlight UX and the AI Copilot in action.
 
 ### BeeFlight UX
-<video src="samples/BeeFlightUx.mp4" controls autoplay loop muted playsinline width="100%" style="border-radius: 8px;"></video>
+<video src="https://raw.githubusercontent.com/tcdomain/Ai/main/samples/BeeFlightUx.mp4" controls loop muted playsinline width="100%" style="border-radius: 8px;"></video>
+*[Download video](https://github.com/tcdomain/Ai/raw/main/samples/BeeFlightUx.mp4) if it doesn't play above*
 
 ### BeeFlight AI Copilot
-<video src="samples/BeeFlightUxAi.mp4" controls autoplay loop muted playsinline width="100%" style="border-radius: 8px;"></video>
+<video src="https://raw.githubusercontent.com/tcdomain/Ai/main/samples/BeeFlightUxAi.mp4" controls loop muted playsinline width="100%" style="border-radius: 8px;"></video>
+*[Download video](https://github.com/tcdomain/Ai/raw/main/samples/BeeFlightUxAi.mp4) if it doesn't play above*
 
 ---
 
