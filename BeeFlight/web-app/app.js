@@ -1462,21 +1462,23 @@ navigator.serial.addEventListener('connect', async (event) => {
                     port = matchedPort;
                     await port.open({ baudRate: 115200 });
 
-                    droneState.connected = true;
-                    connectionStatus.textContent = "Reconnected!";
-                    connectionStatus.classList.add("connected");
-
-                    writer = port.writable.getWriter();
-                    startMspReadLoop();
-                    await initializeDrone();
-
                     const rebootOverlay = document.getElementById('rebootOverlay');
                     if (rebootOverlay) {
-                        rebootOverlay.classList.remove('active');
-                        setTimeout(() => rebootOverlay.classList.add('hidden'), 300);
+                        const subtext = rebootOverlay.querySelector('.reboot-subtext');
+                        if (subtext) subtext.textContent = "Syncing Configuration...";
                     }
-                    showToast('Graceful Hardware Reboot Successful.', 'success');
-                    logToConsole('Hardware Auto-Catch seamless execution.', 'success');
+
+                    logToConsole('Serial port opened. Fetching fresh CLI config...', 'info');
+
+                    // Post-Boot Fetch: Grab the fresh CLI data after the batch flash
+                    await captureCliDiff();
+
+                    // As before, FC resets USB when leaving CLI. Close port and pass the baton.
+                    await port.close();
+
+                    isReconnectingAfterCli = true;
+                    wasRebooting = true; // Track that we came from an auto-catch sequence
+
                 } else {
                     throw new Error("Port not found in previously granted devices.");
                 }
@@ -1507,6 +1509,30 @@ navigator.serial.addEventListener('connect', async (event) => {
             writer = port.writable.getWriter();
             startMspReadLoop();
             await initializeDrone();
+
+            // ---- STATE RE-HYDRATION (Graceful Hardware Reboot Lifecycle) ----
+            if (wasRebooting) {
+                wasRebooting = false;
+
+                // Explicitly redraw the DOM using the freshly pulled droneState.cliDiff
+                if (typeof renderModesTab === 'function') renderModesTab();
+                if (typeof renderPowerTab === 'function') renderPowerTab();
+
+                // Tear down the overlay ONLY after the DOM has been painted with fresh data
+                const rebootOverlay = document.getElementById('rebootOverlay');
+                if (rebootOverlay) {
+                    rebootOverlay.classList.remove('active');
+                    setTimeout(() => {
+                        rebootOverlay.classList.add('hidden');
+                        const subtext = rebootOverlay.querySelector('.reboot-subtext');
+                        if (subtext) subtext.textContent = "Waiting for USB reconnection...";
+                    }, 300);
+                }
+
+                showToast('Graceful Hardware Reboot Successful.', 'success');
+                logToConsole('Hardware Auto-Catch & Config Sync seamless execution.', 'success');
+            }
+
         } catch (err) {
             log.error('Failed to start MSP session on reconnect', err);
             logToConsole(`MSP init failed: ${err.message}`, 'error');
@@ -1562,6 +1588,7 @@ let connectedVid = null;
 let connectedPid = null;
 let isReconnecting = false;
 let isRebooting = false;
+let wasRebooting = false;
 
 async function connectToDrone() {
     if (!('serial' in navigator)) {
