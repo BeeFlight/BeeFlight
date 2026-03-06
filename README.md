@@ -15,12 +15,10 @@ BeeFlight AI is a modern web application that reimagines the traditional flight 
 Below are autoplaying demonstrations of the BeeFlight UX and the AI Copilot in action.
 
 ### BeeFlight UX
-<video src="https://raw.githubusercontent.com/tcdomain/Ai/main/samples/BeeFlightUx.mp4" controls loop muted playsinline width="100%" style="border-radius: 8px;"></video>
-*[Download video](https://github.com/tcdomain/Ai/raw/main/samples/BeeFlightUx.mp4) if it doesn't play above*
+https://github.com/tcdomain/Ai/raw/main/samples/BeeFlightUx.mp4
 
 ### BeeFlight AI Copilot
-<video src="https://raw.githubusercontent.com/tcdomain/Ai/main/samples/BeeFlightUxAi.mp4" controls loop muted playsinline width="100%" style="border-radius: 8px;"></video>
-*[Download video](https://github.com/tcdomain/Ai/raw/main/samples/BeeFlightUxAi.mp4) if it doesn't play above*
+https://github.com/tcdomain/Ai/raw/main/samples/BeeFlightUxAi.mp4
 
 ---
 
