@@ -2005,6 +2005,50 @@ let autoDetectActive = false;
 let autoDetectInterval = null;
 let currentAutoDetectModeId = null;
 let baselineRc = null;
+let hasUnsavedChanges = false;
+
+function updateUnsavedModesUI() {
+    const banner = document.getElementById('unsavedModesBanner');
+    if (!banner) return;
+
+    if (hasUnsavedChanges) {
+        banner.classList.remove('hidden');
+    } else {
+        banner.classList.add('hidden');
+    }
+}
+
+async function batchFlashModes() {
+    if (!window.parsedModes || window.parsedModes.length === 0) {
+        alert("No modes to save.");
+        return;
+    }
+
+    let cliCommands = "mode_color 0 0 0\n";
+    let linkId = 0;
+
+    for (const m of window.parsedModes) {
+        cliCommands += `aux ${linkId} ${m.modeId} ${m.channelIndex} ${m.minRange} ${m.maxRange} 0\n`;
+        linkId++;
+    }
+    cliCommands += "save\n";
+
+    const btnFlash = document.getElementById('btnBatchFlashModes');
+    const originalText = btnFlash ? btnFlash.textContent : 'Save & Flash Modes';
+    if (btnFlash) btnFlash.textContent = "⏳ Flashing...";
+
+    try {
+        await restoreCliData(cliCommands);
+        hasUnsavedChanges = false;
+        updateUnsavedModesUI();
+        showToast("Modes Flashed Successfully", "success");
+    } catch (err) {
+        log.error("Batch mode flash failed", err);
+        alert("Failed to flash modes to the drone.");
+    } finally {
+        if (btnFlash) btnFlash.textContent = originalText;
+    }
+}
 
 function renderModesTab() {
     const modesGrid = document.getElementById('modesGrid');
@@ -2093,27 +2137,28 @@ function renderModesTab() {
         // Wire Delete
         const btnDel = card.querySelector(`#btnDelMode-${mode.modeId}`);
         if (btnDel) {
-            btnDel.addEventListener('click', async () => {
+            btnDel.addEventListener('click', () => {
                 const isConfirmed = confirm(`Are you sure you want to delete the ${mode.modeName} mode link?`);
                 if (!isConfirmed) return;
-                try {
-                    btnDel.disabled = true;
-                    // To delete a mode link, we just override it with an unused link (e.g. range 900-900)
-                    // Or we remove it if using modern BF syntax, but setting safe tight range is universal.
-                    // Better yet, standard betaflight lets us free the mode by removing the line
-                    // But through CLI diff injection, best to omit it and let parser handle, or set zero bounds.
-                    // The safest CLI way to kill a mode link is setting bounds outside standard range
-                    await restoreCliData(`\nmode_color 0 0 0\naux ${mode.modeId} 0 0 900 900 0\nsave\n`);
-                } catch (e) { log.error("Delete mode failed", e); }
+
+                // Draft State Logic: Simply remove from the local array
+                window.parsedModes = window.parsedModes.filter(m => m.modeId !== mode.modeId);
+                hasUnsavedChanges = true;
+
+                // Remove card visually
+                card.remove();
+                updateUnsavedModesUI();
             });
         }
 
         // Wire Manual Channel Select
         const selChan = card.querySelector(`#modeSelect-${mode.modeId}`);
         if (selChan) {
-            selChan.addEventListener('change', async () => {
+            selChan.addEventListener('change', () => {
                 const newAux = parseInt(selChan.value, 10);
-                await updateModeLinkCli(mode.linkId, mode.modeId, newAux, mode.minRange, mode.maxRange);
+                mode.channelIndex = newAux;
+                hasUnsavedChanges = true;
+                updateUnsavedModesUI();
             });
         }
 
@@ -2160,21 +2205,42 @@ function renderModesTab() {
             rangeBox.style.width = `${pWidthPct}%`;
         });
 
-        document.addEventListener('mouseup', async () => {
+        document.addEventListener('mouseup', () => {
             if (isDragging) {
                 isDragging = false;
                 document.body.style.cursor = 'default';
 
-                // Only save and flash if bounds truly mutated
+                // Only register if bounds truly mutated
                 if (pMin !== mode.minRange || pMax !== mode.maxRange) {
-                    const selAux = parseInt(selChan.value, 10);
                     mode.minRange = pMin;
                     mode.maxRange = pMax;
-                    await updateModeLinkCli(mode.linkId, mode.modeId, selAux, pMin, pMax);
+                    hasUnsavedChanges = true;
+                    updateUnsavedModesUI();
                 }
             }
         });
     });
+
+    // Wire up Draft State Banner Buttons
+    const btnBatchFlash = document.getElementById('btnBatchFlashModes');
+    const btnDiscard = document.getElementById('btnDiscardModes');
+
+    if (btnBatchFlash) {
+        const newBtnF = btnBatchFlash.cloneNode(true);
+        btnBatchFlash.parentNode.replaceChild(newBtnF, btnBatchFlash);
+        newBtnF.addEventListener('click', batchFlashModes);
+    }
+
+    if (btnDiscard) {
+        const newBtnD = btnDiscard.cloneNode(true);
+        btnDiscard.parentNode.replaceChild(newBtnD, btnDiscard);
+        newBtnD.addEventListener('click', () => {
+            hasUnsavedChanges = false;
+            updateUnsavedModesUI();
+            // Re-render UI from the original un-mutated CLI diff
+            renderModesTab();
+        });
+    }
 
     // Wire up Add Mode Dropdown
     const btnAddMode = document.getElementById('btnAddMode');
