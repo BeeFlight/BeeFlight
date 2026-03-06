@@ -489,6 +489,41 @@ function appendChatMessage(role, text) {
     }
     chatContainer.appendChild(d);
     chatContainer.scrollTop = chatContainer.scrollHeight;
+} // end function appendChatMessage
+
+/**
+ * Validates AI proposed CLI commands against current drone hardware state.
+ * Returns null if clean, or a DependencyError object if a required link is missing.
+ */
+function validateDependencies(proposedCommands, cliDiff) {
+    if (!cliDiff || !window.CliParser) return null;
+
+    const ports = window.CliParser.parsePorts(cliDiff);
+
+    // Rule 1: GPS Required
+    const needsGps = proposedCommands.some(c =>
+        c.toLowerCase().includes('feature gps') ||
+        c.toLowerCase().includes('set gps_provider')
+    );
+
+    if (needsGps) {
+        // Sensor ID 2 is GPS
+        const hasGpsPort = ports.some(p => p.sensor_1 === 2 || p.sensor_2 === 2 || p.sensor_3 === 2 || p.sensor_4 === 2 || p.sensor_5 === 2);
+        if (!hasGpsPort) return { type: 'UART', required: 'GPS' };
+    }
+
+    // Rule 2: MSP VTX / Displayport Required
+    const needsMspVtx = proposedCommands.some(c =>
+        c.toLowerCase().includes('set osd_displayport_device = msp')
+    );
+
+    if (needsMspVtx) {
+        // Checking for MSP enabled on any hardware UART (id > 0)
+        const hasMspPort = ports.some(p => p.id > 0 && p.mspBaudrate > 0);
+        if (!hasMspPort) return { type: 'UART', required: 'MSP_VTX' };
+    }
+
+    return null;
 }
 
 function renderAiResponse(rawText) {
@@ -578,6 +613,118 @@ function renderAiResponse(rawText) {
     card.appendChild(title);
     card.appendChild(summary);
     card.appendChild(details);
+
+    // Linter Engine Integration
+    const commands = cmds.map(c => String(c || '').trim()).filter(c => c.length > 0);
+    const depError = validateDependencies(commands, droneState.cliDiff);
+
+    let warningDiv = null;
+    let fixDropdown = null;
+
+    if (depError) {
+        approveBtn.disabled = true;
+
+        warningDiv = document.createElement('div');
+        warningDiv.classList.add('action-warning-block');
+        warningDiv.style.backgroundColor = 'rgba(245, 158, 11, 0.15)';
+        warningDiv.style.border = '1px solid rgba(245, 158, 11, 0.5)';
+        warningDiv.style.padding = '12px';
+        warningDiv.style.borderRadius = '8px';
+        warningDiv.style.margin = '12px 0';
+        warningDiv.style.color = 'var(--status-warning)';
+        warningDiv.style.fontSize = '0.9rem';
+
+        const warningTitle = document.createElement('strong');
+        warningTitle.textContent = `⚠️ Missing Hardware Dependency: `;
+        warningTitle.style.display = 'block';
+        warningTitle.style.marginBottom = '8px';
+
+        let reqLabel = depError.required === 'GPS' ? 'a GPS Sensor' : 'an MSP DisplayPort VTX';
+        let fixFlags = depError.required === 'GPS' ? '0 115200 57600 0 115200' : '115200 57600 0 115200'; // simplification for mock
+
+        const warningMsg = document.createElement('span');
+        warningMsg.textContent = `This action requires ${reqLabel} assigned to a ${depError.type}. Select an available UART to automatically inject the fix:`;
+
+        warningDiv.appendChild(warningTitle);
+        warningDiv.appendChild(warningMsg);
+
+        fixDropdown = document.createElement('select');
+        fixDropdown.classList.add('action-fix-dropdown');
+        fixDropdown.style.display = 'block';
+        fixDropdown.style.marginTop = '8px';
+        fixDropdown.style.padding = '6px';
+        fixDropdown.style.background = 'var(--bg-input)';
+        fixDropdown.style.color = 'var(--text-primary)';
+        fixDropdown.style.border = '1px solid var(--border-subtle)';
+        fixDropdown.style.borderRadius = '4px';
+        fixDropdown.style.width = '100%';
+
+        const defaultOpt = document.createElement('option');
+        defaultOpt.value = '';
+        defaultOpt.textContent = '-- Select UART --';
+        fixDropdown.appendChild(defaultOpt);
+
+        if (window.CliParser && droneState.cliDiff) {
+            const ports = window.CliParser.parsePorts(droneState.cliDiff);
+            // Assume FC has 8 standard UARTs (ids 1 through 8, indices 0 through 7)
+            for (let i = 1; i <= 8; i++) {
+                const serialIndex = i - 1;
+                const portCfg = ports.find(p => p.id === i);
+                const isUsed = portCfg && (portCfg.rxIndicator > 0 || portCfg.mspBaudrate > 0 || portCfg.sensor_1 > 0);
+
+                const opt = document.createElement('option');
+                opt.value = serialIndex;
+                opt.textContent = `UART ${i}${isUsed ? ' (In Use)' : ''}`;
+                if (isUsed) opt.disabled = true;
+                fixDropdown.appendChild(opt);
+            }
+        }
+
+        fixDropdown.addEventListener('change', (e) => {
+            const selectedIdx = e.target.value;
+            if (selectedIdx === '') {
+                approveBtn.disabled = true;
+                approveBtn.textContent = 'Approve & Flash';
+                return;
+            }
+
+            let fixCmd = '';
+            if (depError.required === 'GPS') {
+                // index 1 for rxIndicator is GPS sensor bit, but raw CLI: serial [identifier] [functionMask] [mspBaudrate] [gpsBaudrate] [telemetryBaudrate] [blackboxBaudrate]
+                // Function mask 2 is sensor GPS.
+                fixCmd = `serial ${selectedIdx} 2 115200 57600 0 115200`;
+            } else if (depError.required === 'MSP_VTX') {
+                // MSP function mask is 1 (or combined). 
+                fixCmd = `serial ${selectedIdx} 1 115200 57600 0 115200`;
+            }
+
+            // Resolution Injector
+            if (fixCmd) {
+                // Remove any previous injected fix to prevent duplicates
+                const baseCommands = cmds.filter(c => !c.startsWith('serial '));
+                baseCommands.unshift(fixCmd);
+
+                // Update internal array so validation passes and execution flashes correct data
+                commands.length = 0;
+                commands.push(...baseCommands);
+
+                // Update visual representation
+                codeBlock.textContent = commands.join('\n');
+
+                // UI cleanup
+                warningDiv.style.opacity = '0.5';
+                fixDropdown.disabled = true;
+                approveBtn.disabled = false;
+                approveBtn.textContent = 'Fix & Flash';
+                statusText.textContent = 'Hardware dependency satisfied by resolution injector.';
+                statusText.style.color = 'var(--status-success)';
+            }
+        });
+
+        warningDiv.appendChild(fixDropdown);
+        card.appendChild(warningDiv);
+    }
+
     card.appendChild(actionsRow);
     card.appendChild(statusText);
 
@@ -586,7 +733,6 @@ function renderAiResponse(rawText) {
     chatContainer.scrollTop = chatContainer.scrollHeight;
 
     // Execution wiring
-    const commands = cmds.map(c => String(c || '').trim()).filter(c => c.length > 0);
 
     approveBtn.addEventListener('click', async () => {
         if (commands.length === 0) {
@@ -596,7 +742,7 @@ function renderAiResponse(rawText) {
 
         // Security validation
         const banned = ['resource', 'defaults', 'timer', 'dma', 'flash'];
-        const allowedPrefixes = ['set', 'profile', 'rateprofile', 'save'];
+        const allowedPrefixes = ['set', 'profile', 'rateprofile', 'save', 'serial', 'feature'];
         for (const cmd of commands) {
             const lower = cmd.toLowerCase();
             if (banned.some(b => lower.includes(b))) {
@@ -3232,7 +3378,7 @@ function renderMotorsTab() {
 // OSD Tab Rendering
 // ---------------------------------------------------------
 function renderOsdTab() {
-    // System Select Click Handlers
+    // System Select Click Handlers (Manual selection)
     document.querySelectorAll('.osd-sys-card').forEach(card => {
         card.addEventListener('click', () => {
             const system = card.dataset.system;
@@ -3254,9 +3400,51 @@ function renderOsdTab() {
             document.getElementById('osdEditor').classList.remove('hidden');
 
             window.OsdEditor.renderCanvas();
-            logToConsole(`OSD Editor initialized (${system.toUpperCase()}, ${window.OsdEditor.elements.length} elements)`, 'success');
+            logToConsole(`OSD Editor manually initialized (${system.toUpperCase()}, ${window.OsdEditor.elements.length} elements)`, 'success');
         });
     });
+
+    // Auto-Bypass Logic based on detected VTX configuration
+    if (droneState.vtx && droneState.cliDiff && window.OsdEditor) {
+        let detectedSystem = null;
+
+        // If osd_displayport_device is explicitly MSP/Walksnail etc (or not NONE)
+        if (droneState.vtx.isHdDigital) {
+            detectedSystem = 'hd';
+        } else if (droneState.vtx.hasAnalogVtxOnSerial) {
+            // OR if we detected analog VTX on a serial port
+            detectedSystem = 'analog';
+        } else if (droneState.vtx.osdDisplayportDevice) {
+            const rawRaw = String(droneState.vtx.osdDisplayportDevice).toUpperCase();
+            // If it's MAX7456 or explicitly 0
+            if (rawRaw === 'MAX7456' || rawRaw === '0') {
+                detectedSystem = 'analog';
+            }
+        }
+
+        if (detectedSystem) {
+            window.OsdEditor.setVideoSystem(detectedSystem);
+            window.OsdEditor.parseFromCli(droneState.cliDiff);
+
+            const canvas = document.getElementById('osdCanvas');
+            if (canvas) {
+                const cols = detectedSystem === 'hd' ? 50 : 30;
+                const rows = detectedSystem === 'hd' ? 18 : 16;
+                canvas.style.backgroundSize = `calc(100% / ${cols}) calc(100% / ${rows})`;
+            }
+
+            // Hide system select, show editor directly
+            document.getElementById('osdSystemSelect').classList.add('hidden');
+            document.getElementById('osdEditor').classList.remove('hidden');
+
+            window.OsdEditor.renderCanvas();
+            logToConsole(`OSD Auto-Bypass: Detected ${detectedSystem.toUpperCase()} system. Skipping selection screen.`, 'success');
+        } else {
+            // Unconfigured or unknown: show manual selection screen
+            document.getElementById('osdSystemSelect').classList.remove('hidden');
+            document.getElementById('osdEditor').classList.add('hidden');
+        }
+    }
 
     // Template Button Click Handlers
     document.querySelectorAll('.osd-template-btn').forEach(btn => {

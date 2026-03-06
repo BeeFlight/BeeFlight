@@ -117,6 +117,71 @@ const OsdEditor = {
     },
 
     /**
+     * Render the Elements Drawer (inactive elements).
+     */
+    renderDrawer() {
+        const drawer = document.getElementById('osdElementsBank');
+        if (!drawer) return;
+
+        drawer.innerHTML = '';
+        const inactiveElements = this.elements.filter(e => !e.visible);
+
+        inactiveElements.forEach((elem, originalIndex) => {
+            const div = document.createElement('div');
+            div.className = 'osd-drawer-item';
+            div.draggable = true;
+            div.dataset.index = this.elements.indexOf(elem); // use global index
+
+            const iconSpan = document.createElement('span');
+            iconSpan.className = 'osd-drawer-icon';
+            iconSpan.textContent = elem.icon;
+
+            const labelSpan = document.createElement('span');
+            labelSpan.className = 'osd-drawer-label';
+            labelSpan.textContent = elem.label;
+
+            div.appendChild(iconSpan);
+            div.appendChild(labelSpan);
+
+            div.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', div.dataset.index);
+                div.classList.add('dragging');
+            });
+
+            div.addEventListener('dragend', () => {
+                div.classList.remove('dragging');
+            });
+
+            drawer.appendChild(div);
+        });
+
+        // Drawer drop zone to deactivate elements
+        drawer.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        });
+
+        drawer.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const index = parseInt(e.dataTransfer.getData('text/plain'), 10);
+            if (isNaN(index)) return;
+
+            const elem = this.elements[index];
+            if (!elem.visible) return; // already inactive
+
+            elem.visible = false;
+            const newPosInt = this.encodePosition(elem.row, elem.col, false);
+
+            const cmd = `set ${elem.key} = ${newPosInt}`;
+            this.pendingCommands = this.pendingCommands.filter(c => !c.startsWith(`set ${elem.key} =`));
+            this.pendingCommands.push(cmd);
+
+            this.renderCanvas(); // updates both canvas and drawer
+            this._updatePendingUI();
+        });
+    },
+
+    /**
      * Render OSD elements onto the canvas as draggable divs.
      */
     renderCanvas() {
@@ -156,43 +221,51 @@ const OsdEditor = {
             canvas.appendChild(div);
         });
 
-        // Canvas drop zone
-        canvas.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-        });
+        // Ensure drop listeners are only added once
+        if (!canvas.dataset.dropWired) {
+            canvas.dataset.dropWired = 'true';
+            canvas.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+            });
 
-        canvas.addEventListener('drop', (e) => {
-            e.preventDefault();
-            const index = parseInt(e.dataTransfer.getData('text/plain'), 10);
-            if (isNaN(index)) return;
+            canvas.addEventListener('drop', (e) => {
+                e.preventDefault();
+                const index = parseInt(e.dataTransfer.getData('text/plain'), 10);
+                if (isNaN(index)) return;
 
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
 
-            // Calculate new grid position
-            const newCol = Math.round((x / rect.width) * this.gridCols);
-            const newRow = Math.round((y / rect.height) * this.gridRows);
+                // Calculate new grid position
+                const newCol = Math.round((x / rect.width) * this.gridCols);
+                const newRow = Math.round((y / rect.height) * this.gridRows);
 
-            // Clamp
-            const clampedCol = Math.max(0, Math.min(this.gridCols - 1, newCol));
-            const clampedRow = Math.max(0, Math.min(this.gridRows - 1, newRow));
+                // Clamp
+                const clampedCol = Math.max(0, Math.min(this.gridCols - 1, newCol));
+                const clampedRow = Math.max(0, Math.min(this.gridRows - 1, newRow));
 
-            // Update element
-            const elem = this.elements[index];
-            elem.row = clampedRow;
-            elem.col = clampedCol;
-            const newPosInt = this.encodePosition(clampedRow, clampedCol, elem.visible);
+                // Update element
+                const elem = this.elements[index];
+                elem.row = clampedRow;
+                elem.col = clampedCol;
+                elem.visible = true; // Activating element if it came from drawer
+                const newPosInt = this.encodePosition(clampedRow, clampedCol, true);
 
-            // Generate CLI command
-            const cmd = `set ${elem.key} = ${newPosInt}`;
-            this.pendingCommands.push(cmd);
+                // Generate CLI command
+                const cmd = `set ${elem.key} = ${newPosInt}`;
+                // Remove existing pending command for this key
+                this.pendingCommands = this.pendingCommands.filter(c => !c.startsWith(`set ${elem.key} =`));
+                this.pendingCommands.push(cmd);
 
-            // Re-render
-            this.renderCanvas();
-            this._updatePendingUI();
-        });
+                // Re-render
+                this.renderCanvas();
+                this._updatePendingUI();
+            });
+        }
+
+        this.renderDrawer();
     },
 
     /**

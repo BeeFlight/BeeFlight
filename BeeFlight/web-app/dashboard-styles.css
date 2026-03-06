@@ -864,7 +864,8 @@
 
 .osd-canvas {
     position: relative;
-    width: 100%;
+    flex-grow: 1;
+    min-width: 0;
     aspect-ratio: 16 / 9;
     background: #0a0e14;
     border: 2px solid var(--border-subtle);
@@ -874,6 +875,71 @@
         linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
         linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
     background-size: calc(100% / 30) calc(100% / 16);
+}
+
+.osd-editor-layout {
+    display: flex;
+    gap: 16px;
+    width: 100%;
+}
+
+.osd-elements-bank {
+    width: 220px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: 12px;
+    height: 450px;
+    overflow-y: auto;
+}
+
+.osd-drawer-placeholder {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-align: center;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-subtle);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.osd-drawer-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    cursor: grab;
+    transition: all 0.2s;
+    user-select: none;
+}
+
+.osd-drawer-item:hover {
+    border-color: var(--accent);
+    background: rgba(0, 240, 255, 0.05);
+}
+
+.osd-drawer-item.dragging {
+    opacity: 0.5;
+    cursor: grabbing;
+}
+
+.osd-drawer-icon {
+    font-size: 1.2rem;
+}
+
+.osd-drawer-label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-primary);
 }
 
 .osd-element {

@@ -6,7 +6,24 @@
 
 **The intelligent, conversational copilot for FPV drone configuration.**
 
+<p align="center">
+  <!-- Note: Replace "docs/dashboard-preview.png" with the path or URL of your uploaded screenshot -->
+  <img src="docs/dashboard-preview.png" alt="BeeFlight AI Dashboard" width="800" style="border-radius: 8px;" />
+</p>
+
 BeeFlight AI is a modern web application that reimagines the traditional flight controller setup process. By replacing dense, spreadsheet-like tables with an AI-driven, intent-based interface, this project democratizes FPV drone building and tuning for beginners while streamlining workflows for advanced pilots.
+
+---
+
+## 🎥 Video Demos
+
+Below are autoplaying demonstrations of the BeeFlight UX and the AI Copilot in action.
+
+### BeeFlight UX
+<video src="samples/BeeFlightUx.mp4" controls autoplay loop muted playsinline width="100%" style="border-radius: 8px;"></video>
+
+### BeeFlight AI Copilot
+<video src="samples/BeeFlightUxAi.mp4" controls autoplay loop muted playsinline width="100%" style="border-radius: 8px;"></video>
 
 ---
 
@@ -32,6 +49,8 @@ This application uses a unique "Hybrid Data Architecture" to deliver both real-t
 ### 🤖 The AI Copilot (Agent Mode)
 A persistent chat interface fixed to the right side of the screen. The Copilot is context-aware, meaning it knows exactly what drone you plugged in. Ask it to "change my VTX to Raceband 8" or "bump up my pitch P a little," and it generates structured **Action Cards**: human-readable summaries plus the exact CLI commands, wrapped in a JSON `action` block for **Approve & Flash** / **Undo (Rollback)** flows.
 
+**Dependency Linter Engine:** Action Cards feature a built-in pre-flight linter. If the AI proposes a command that requires missing hardware (e.g., GPS or an MSP VTX), the **Interceptor UI** blocks the flash and injects a resolution dropdown, allowing you to easily map an available UART before applying.
+
 ### 📊 Modern, Read-Only Dashboards
 The legacy left-hand tabs have been completely redesigned into semantic, read-only status hubs:
 * **Setup:** Live battery stats, CPU load, Arming Flags, and a live 3D procedural representation of your drone's attitude.
@@ -40,7 +59,7 @@ The legacy left-hand tabs have been completely redesigned into semantic, read-on
 * **Receiver:** Live RC channel visualizer that moves instantly when you move your physical radio sticks.
 * **Modes:** Replaces complex sliders with interactive "Mode Cards" (ARM, ANGLE, TURTLE) that instantly glow green when you flip the correct physical switch on your radio.
 * **Motors (Safety First):** A purely diagnostic dashboard. Features procedural 3D spinning propellers (powered by Three.js) that adapt to your exact drone geometry (Quad, Hex, etc.) and motor spin direction. Displays live RPM telemetry via Bidirectional DSHOT. *Note: Manual motor spinning via the browser is strictly disabled for safety.*
-* **OSD (Hybrid Canvas):** Features one-click AI templates ("Apply Long Range Layout") alongside a smart drag-and-drop HTML canvas that automatically supports both HD Digital and Analog grid sizes.
+* **OSD (Hybrid Canvas):** Features one-click AI templates ("Apply Long Range Layout"), an **Elements Drawer** for dragging inactive items onto the screen, and smart auto-detection that builds the correct grid dimensions (HD 50x18 vs Analog 30x16) while accurately handling Betaflight's bitwise coordinate math behind the scenes.
 * **Blackbox:** Intent-driven configuration ("Diagnose Filters" vs. "General Flight") and one-click Mass Storage (MSC) mounting.
 * **VTX:** Intelligently detects if you are using Analog (SmartAudio) or HD Digital (MSP DisplayPort) and adapts the UI to prevent useless CLI commands.
 * **PID Tuning & Rates:** Read-only snapshot of PID gains, rates, and filter cutoffs, plus an AI-powered *Symptom-Based* tuner (e.g. "hot motors", "propwash on descent") that proposes safe Action Cards instead of raw CLI.
