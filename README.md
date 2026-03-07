@@ -39,6 +39,12 @@ The standard Betaflight Configurator is powerful but assumes familiarity with UA
 
 ---
 
+## Disclaimer
+
+**Use at your own risk.** BeeFlight AI allows you to read and write flight-controller configuration. Incorrect or incompatible settings can damage ESCs, motors, or the flight controller, and can cause loss of control, crashes, or injury. Always verify changes (including AI-suggested commands) before flying. Backup your config before applying changes. The authors and contributors are not responsible for any damage or loss resulting from use of this software.
+
+---
+
 ## Quick start
 
 ```bash
