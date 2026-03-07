@@ -1,119 +1,75 @@
 <p align="center">
-  <img src="docs/logo2.png" alt="BeeFlight AI bee logo" width="180" />
+  <img src="docs/logo2.png" alt="BeeFlight AI" width="160" />
 </p>
 
-# 🐝 BeeFlight AI
+# BeeFlight AI
 
-**The intelligent, conversational copilot for FPV drone configuration.**
+**Conversational copilot for Betaflight FPV drone configuration.**
 
-BeeFlight AI is a modern web application that reimagines the traditional flight controller setup process. By replacing dense, spreadsheet-like tables with an AI-driven, intent-based interface, this project democratizes FPV drone building and tuning for beginners while streamlining workflows for advanced pilots.
-
----
-
-## 🎥 Video Demos
-
-Below are autoplaying demonstrations of the BeeFlight UX and the AI Copilot in action.
-
-### BeeFlight UX
-https://github.com/tcdomain/Ai/raw/main/samples/BeeFlightUx.mp4
-
-### BeeFlight AI Copilot
-https://github.com/tcdomain/Ai/raw/main/samples/BeeFlightUxAi.mp4
+BeeFlight AI is a browser-based configurator that connects to your flight controller over USB (Web Serial), reads your CLI configuration, and uses an AI assistant to suggest and apply changes via structured Action Cards with Approve & Flash and Undo (Rollback).
 
 ---
 
-## 🎯 The Goal
+## Overview
 
-The standard open-source Betaflight Configurator is incredibly powerful, but it requires deep prerequisite knowledge of UART bitmasks, PID loops, filters, and CLI commands. 
+The standard Betaflight Configurator is powerful but assumes familiarity with UART bitmasks, PID loops, filters, and CLI syntax. BeeFlight AI reduces that barrier: you describe what you want (e.g. “change VTX to Raceband 8”, “bump pitch P”), and the Copilot proposes safe CLI changes you can apply in one click or roll back.
 
-**BeeFlight AI aims to bridge that knowledge gap.** Instead of forcing users to hunt for obscure settings, the app uses the Web Serial API to extract the drone's entire configuration and feeds it to a Google Gemini-powered Copilot. You don't need to know how to calculate a voltage divider or write a `set osd_vbat_pos` command—you just tell the AI what you want to do, and it handles the math and syntax for you.
-
----
-
-## 🧠 Core Architecture (The Hybrid Engine)
-
-This application uses a unique "Hybrid Data Architecture" to deliver both real-time UI responsiveness and deep AI context:
-
-1. **Live Telemetry (MSP):** The app constantly polls the MultiWii Serial Protocol (MSP) to drive live UI elements like the 3D model, battery voltage, and radio stick inputs without interrupting the flight controller.
-2. **Deep Context (CLI):** Upon connection, the app silently scrapes the drone's brain using the `dump` command. This massive text block is fed directly into the Gemini AI's system prompt, giving the Copilot absolute awareness of your specific hardware (e.g., "You are connected to a BetaFPV F405 running DShot300 and SBUS").
+- **Live telemetry (MSP)** — Battery, attitude, RC channels, and tab-specific readouts.
+- **Deep context (CLI)** — On connect, the app captures a `diff`/`dump` and feeds it into the AI so suggestions match your board and firmware.
 
 ---
 
-## ✨ Key Features & Modules
+## Features
 
-### 🤖 The AI Copilot (Agent Mode)
-A persistent chat interface fixed to the right side of the screen. The Copilot is context-aware, meaning it knows exactly what drone you plugged in. Ask it to "change my VTX to Raceband 8" or "bump up my pitch P a little," and it generates structured **Action Cards**: human-readable summaries plus the exact CLI commands, wrapped in a JSON `action` block for **Approve & Flash** / **Undo (Rollback)** flows.
-
-**Dependency Linter Engine:** Action Cards feature a built-in pre-flight linter. If the AI proposes a command that requires missing hardware (e.g., GPS or an MSP VTX), the **Interceptor UI** blocks the flash and injects a resolution dropdown, allowing you to easily map an available UART before applying.
-
-### 📊 Modern, Read-Only Dashboards
-The legacy left-hand tabs have been completely redesigned into semantic, read-only status hubs:
-* **Setup:** Live battery stats, CPU load, Arming Flags, and a live 3D procedural representation of your drone's attitude.
-* **Ports:** Replaces the confusing bitmask spreadsheet with a simple UI showing what "Job" is currently assigned to each UART (e.g., "UART 1: 🟢 Serial RX").
-* **Power & Battery:** Displays live voltage/amperage alongside calibration settings. Features an AI math assistant for easy multimeter calibration.
-* **Receiver:** Live RC channel visualizer that moves instantly when you move your physical radio sticks.
-* **Modes:** Replaces complex sliders with interactive "Mode Cards" (ARM, ANGLE, TURTLE) that instantly glow green when you flip the correct physical switch on your radio.
-* **Motors (Safety First):** A purely diagnostic dashboard. Features procedural 3D spinning propellers (powered by Three.js) that adapt to your exact drone geometry (Quad, Hex, etc.) and motor spin direction. Displays live RPM telemetry via Bidirectional DSHOT. *Note: Manual motor spinning via the browser is strictly disabled for safety.*
-* **OSD (Hybrid Canvas):** Features one-click AI templates ("Apply Long Range Layout"), an **Elements Drawer** for dragging inactive items onto the screen, and smart auto-detection that builds the correct grid dimensions (HD 50x18 vs Analog 30x16) while accurately handling Betaflight's bitwise coordinate math behind the scenes.
-* **Blackbox:** Intent-driven configuration ("Diagnose Filters" vs. "General Flight") and one-click Mass Storage (MSC) mounting.
-* **VTX:** Intelligently detects if you are using Analog (SmartAudio) or HD Digital (MSP DisplayPort) and adapts the UI to prevent useless CLI commands.
-* **PID Tuning & Rates:** Read-only snapshot of PID gains, rates, and filter cutoffs, plus an AI-powered *Symptom-Based* tuner (e.g. "hot motors", "propwash on descent") that proposes safe Action Cards instead of raw CLI.
-* **Backup:** Dedicated Backup tab for exporting configuration to **local .txt**, **Google Drive**, or **GitHub Gists** (secret by default), with integration settings managed in the app’s Settings modal.
-
-### 🧪 Zero-Friction Automated Testing
-Includes an integrated `localStorage` mock-data pipeline. Developers can click "Capture Live Drone," save the physical drone's exact CLI dump to the browser's memory, and run autonomous QA Agent testing without needing the drone plugged in.
+| Area | Description |
+|------|-------------|
+| **AI Copilot** | Chat sidebar with context-aware Action Cards (intent, summary, CLI commands). Approve & Flash or Undo after apply. |
+| **Dashboards** | Setup, Ports, Power, Receiver, Modes, Motors (diagnostic 3D props, no spin-from-browser), OSD, Blackbox, VTX, PID & Rates, Backup. |
+| **Backup / Restore** | Export to local `.txt`, Google Drive, or GitHub Gists. Restore with AI pre-flight checklist (hardware, version, integrity, motor protocol) and line-by-line CLI flash. |
+| **Safety** | Action Card linter blocks unsafe or mismatched commands; session history enables rollback per approval. |
 
 ---
 
-## 🧬 Backup, Restore & Time Machine
+## Requirements
 
-BeeFlight AI includes a full **backup/restore pipeline** designed around safety and reversibility:
+- **Browser:** Chromium-based (Chrome, Edge, Brave, Opera). Web Serial is required; Safari and Firefox are not supported.
+- **Node.js:** 18+ if using the included dev server.
+- **AI:** At least one provider API key (e.g. Gemini) in Settings. Keys are stored only in the browser (localStorage).
+- **Hardware:** Betaflight FC over USB (typically 115200 baud).
 
-- **Multi-destination export:** One-click export of the live `diff all` to:
-  - Local download (`.txt` file with board name + date)
-  - Google Drive (via Drive API with `drive.file` scope)
-  - GitHub Gists (PAT-based auth, secret by default unless you opt-in to public)
-- **AI Pre-Flight Checklist (Restore):**
-  - When you select a backup file, only a small header/tail snippet is sent to Gemini, along with live `board_name` and firmware version.
-  - The **Betaflight Safety Inspector** returns a strict JSON object with:
-    - `hardwareMatch` — does the backup target match the connected FC?
-    - `versionMatch` — are Betaflight major/minor versions compatible?
-    - `fileIntegrity` — does it look like a valid dump, ending in `save`?
-    - `motorSafety` — is the motor protocol a DSHOT variant?
-  - A visual checklist in the UI must pass all four items before the "Overwrite Current Settings" button unlocks.
-- **Safe line-by-line flasher:** Restores run through a guarded CLI pipeline that:
-  - Enters CLI mode, sends each line with small delays, tracks progress, then issues a final `save`.
-  - Handles FC reboot gracefully and guides the user to reconnect.
-- **Session History & Undo:** Every AI Action Card approval snapshots the previous CLI dump into `sessionHistory`. If something feels wrong, the **Undo (Rollback)** button uses the same flasher to replay the last known-good configuration, then marks the card as **“⏪ Rollback Complete”**.
+---
 
-## 🚀 Getting Started
+## Quick start
 
-### Requirements to run the application
+```bash
+git clone https://github.com/tcdomain/Ai.git
+cd Ai/BeeFlight/web-app
+npm install
+npm run start
+```
 
-| Requirement | Details |
-|-------------|--------|
-| **Browser** | Chromium-based only: Chrome, Edge, Brave, or Opera. The **Web Serial API** is required to connect to the flight controller; Safari and Firefox are not supported. |
-| **Node.js** | **v18+** (LTS recommended) for the local dev server. Not required if you serve the static files with another HTTP server. |
-| **AI provider** | At least one API key (e.g. **Google Gemini**) entered in Settings. Keys are stored only in your browser (localStorage); they are never sent to this repo’s servers. |
-| **Hardware** | An FPV drone running **Betaflight**, connected via USB (typically 115200 baud). |
+Open **http://localhost:3000**, click **Connect Drone**, choose the FC serial port, then configure your API key in **Settings** if needed.
 
-### Prerequisites (quick list)
-* Chromium-based browser (Chrome, Edge, Brave, or Opera).
-* Node.js 18+ if using the included dev server.
-* A valid AI API key (e.g. Gemini) configured in the app Settings.
-* An FPV drone running Betaflight.
+---
 
-### Installation & Usage
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/tcdomain/Ai.git
-   cd Ai
-   ```
-2. Install and run the web app (from the repo root):
-   ```bash
-   cd BeeFlight/web-app
-   npm install
-   npm run start
-   ```
-3. Open **http://localhost:3000** in a Chromium-based browser.
-4. Click **Connect Drone**, select your FC’s serial port, then add your API key in **Settings** if prompted.
+## Project layout
+
+```
+Ai/
+├── BeeFlight/web-app/   # Static app (HTML, JS, CSS); run with npm run start
+├── docs/                # Logo and docs
+├── samples/             # Optional demo assets (e.g. videos)
+└── tools/               # Helper scripts (e.g. serial CLI)
+```
+
+---
+
+## Security
+
+API keys and tokens are entered in the app and stored in **localStorage** only. They are sent directly to the chosen AI provider (e.g. Google, OpenAI); they are not sent to this repository’s servers.
+
+---
+
+## License
+
+See repository for license information.
