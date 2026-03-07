@@ -7,6 +7,13 @@ api_key*
 .DS_Store
 Thumbs.db
 
+# Dependencies / build
+node_modules/
+*.log
+dist/
+build/
+.idea/
+
 # IDE
 .vscode/
 *.code-workspace
