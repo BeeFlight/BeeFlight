@@ -88,13 +88,32 @@ BeeFlight AI includes a full **backup/restore pipeline** designed around safety 
 
 ## 🚀 Getting Started
 
-### Prerequisites
-* A Chromium-based web browser (Google Chrome, Microsoft Edge, Brave, or Opera). *Note: Safari and Firefox do not currently support the Web Serial API.*
-* A valid **Google Gemini API Key**.
-* An FPV Drone running Betaflight.
+### Requirements to run the application
+
+| Requirement | Details |
+|-------------|--------|
+| **Browser** | Chromium-based only: Chrome, Edge, Brave, or Opera. The **Web Serial API** is required to connect to the flight controller; Safari and Firefox are not supported. |
+| **Node.js** | **v18+** (LTS recommended) for the local dev server. Not required if you serve the static files with another HTTP server. |
+| **AI provider** | At least one API key (e.g. **Google Gemini**) entered in Settings. Keys are stored only in your browser (localStorage); they are never sent to this repo’s servers. |
+| **Hardware** | An FPV drone running **Betaflight**, connected via USB (typically 115200 baud). |
+
+### Prerequisites (quick list)
+* Chromium-based browser (Chrome, Edge, Brave, or Opera).
+* Node.js 18+ if using the included dev server.
+* A valid AI API key (e.g. Gemini) configured in the app Settings.
+* An FPV drone running Betaflight.
 
 ### Installation & Usage
-1. Clone this repository to your local machine:
+1. Clone this repository:
    ```bash
    git clone https://github.com/tcdomain/Ai.git
+   cd Ai
    ```
+2. Install and run the web app (from the repo root):
+   ```bash
+   cd BeeFlight/web-app
+   npm install
+   npm run start
+   ```
+3. Open **http://localhost:3000** in a Chromium-based browser.
+4. Click **Connect Drone**, select your FC’s serial port, then add your API key in **Settings** if prompted.

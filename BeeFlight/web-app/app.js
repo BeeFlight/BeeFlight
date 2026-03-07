@@ -2164,7 +2164,10 @@ function renderModesTab() {
         return;
     }
 
-    window.parsedModes = window.CliParser.parseModes(droneState.cliDiff);
+    // When we have unsaved draft changes, use current parsedModes; otherwise re-parse from CLI
+    if (!hasUnsavedChanges) {
+        window.parsedModes = window.CliParser.parseModes(droneState.cliDiff);
+    }
 
     if (!window.parsedModes || window.parsedModes.length === 0) {
         modesGrid.innerHTML = `<div class="mode-item placeholder" style="grid-column: 1 / -1; text-align: center; padding: 40px;">
@@ -2243,12 +2246,9 @@ function renderModesTab() {
                 const isConfirmed = confirm(`Are you sure you want to delete the ${mode.modeName} mode link?`);
                 if (!isConfirmed) return;
 
-                // Draft State Logic: Simply remove from the local array
-                window.parsedModes = window.parsedModes.filter(m => m.modeId !== mode.modeId);
+                window.parsedModes = (window.parsedModes || []).filter(m => m.modeId !== mode.modeId);
                 hasUnsavedChanges = true;
-
-                // Remove card visually
-                card.remove();
+                renderModesTab();
                 updateUnsavedModesUI();
             });
         }
@@ -2387,6 +2387,22 @@ function renderModesTab() {
                 const btnOriginalText = newBtnAddMode.textContent;
                 newBtnAddMode.textContent = '⏳ Adding...';
                 try {
+                    // Push new mode into draft state so the grid re-renders
+                    const newMode = {
+                        modeId: mId,
+                        linkId: nextLinkId,
+                        modeName: mName,
+                        channelIndex: 0,
+                        channelName: 'AUX 1',
+                        minRange: 1300,
+                        maxRange: 1700
+                    };
+                    window.parsedModes = window.parsedModes || [];
+                    window.parsedModes.push(newMode);
+                    hasUnsavedChanges = true;
+                    renderModesTab();
+                    updateUnsavedModesUI();
+
                     await restoreCliData(cmds);
                 } catch (err) {
                     log.error('Add mode failed', err);
@@ -2572,12 +2588,15 @@ async function startAutoDetect(modeId, btnElement) {
                     rangeBox.style.width = `${pWidthPct}%`;
                 }
 
-                // Immediately flash the calculated range and channel to the FC
+                // Update draft state so dropdown and slider stay in sync on re-render
                 const targetMode = window.parsedModes.find(m => m.modeId === modeId);
                 if (targetMode) {
+                    targetMode.channelIndex = i;
                     targetMode.minRange = newMin;
                     targetMode.maxRange = newMax;
-                    targetMode.channelIndex = i; // Save new mapping locally
+                    hasUnsavedChanges = true;
+                    renderModesTab();
+                    updateUnsavedModesUI();
                     await updateModeLinkCli(targetMode.linkId, modeId, i, newMin, newMax);
                 }
 
