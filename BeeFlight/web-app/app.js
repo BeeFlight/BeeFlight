@@ -1483,6 +1483,13 @@ navigator.serial.addEventListener('connect', async (event) => {
                     port = matchedPort;
                     await port.open({ baudRate: 115200 });
 
+                    // Windows USB VCP (STM32) often requires DTR/RTS to be asserted to stream data
+                    try {
+                        await port.setSignals({ dataTerminalReady: true, requestToSend: true });
+                    } catch (e) {
+                        log.info('DTR/RTS setSignals not supported or failed (ignoring)');
+                    }
+
                     const rebootOverlay = document.getElementById('rebootOverlay');
                     if (rebootOverlay) {
                         const subtext = rebootOverlay.querySelector('.reboot-subtext');
@@ -1523,6 +1530,10 @@ navigator.serial.addEventListener('connect', async (event) => {
 
         try {
             await port.open({ baudRate: 115200 });
+            try {
+                await port.setSignals({ dataTerminalReady: true, requestToSend: true });
+            } catch (e) { }
+
             droneState.connected = true;
             connectionStatus.textContent = "Connected";
             connectionStatus.classList.add("connected");
@@ -1633,6 +1644,15 @@ async function connectToDrone() {
     // ---- PHASE A: Open port, capture CLI diff ----
     try {
         await port.open({ baudRate: 115200 });
+
+        // Windows USB VCP (STM32) often requires DTR/RTS to be asserted to stream data.
+        // Node's serialport does this automatically, Chrome's Web Serial does not.
+        try {
+            await port.setSignals({ dataTerminalReady: true, requestToSend: true });
+        } catch (e) {
+            log.info('DTR/RTS setSignals not supported or failed (ignoring)');
+        }
+
         logToConsole('Serial port opened. Initiating CLI diff...', 'success');
         showDashboard();
 
