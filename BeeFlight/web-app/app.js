@@ -1897,15 +1897,21 @@ if (importFileInput) {
             if (restoreStateChecklist) restoreStateChecklist.classList.remove('hidden');
 
             const mapping = [
-                { key: 'hardwareMatch', icon: chkHardwareIcon },
-                { key: 'versionMatch', icon: chkVersionIcon },
-                { key: 'fileIntegrity', icon: chkIntegrityIcon },
-                { key: 'motorSafety', icon: chkMotorIcon }
+                { key: 'hardwareMatch', icon: chkHardwareIcon, critical: true },
+                { key: 'versionMatch', icon: chkVersionIcon, critical: false },
+                { key: 'fileIntegrity', icon: chkIntegrityIcon, critical: true },
+                { key: 'motorSafety', icon: chkMotorIcon, critical: true }
             ];
-            let allPass = true;
-            mapping.forEach(({ key, icon }) => {
+
+            let allCriticalPass = true;
+            let anyWarnings = false;
+
+            mapping.forEach(({ key, icon, critical }) => {
                 const pass = !!result[key];
-                if (!pass) allPass = false;
+                if (!pass) {
+                    if (critical) allCriticalPass = false;
+                    else anyWarnings = true;
+                }
                 if (!icon) return;
                 icon.textContent = pass ? '✅' : '❌';
                 icon.classList.remove('pass', 'fail');
@@ -1913,9 +1919,16 @@ if (importFileInput) {
             });
 
             if (importErrorBox) {
-                if (!allPass) {
-                    importErrorBox.textContent = result.reasoning || 'One or more checks failed. Restore is blocked.';
+                if (!allCriticalPass) {
+                    importErrorBox.textContent = result.reasoning || 'Critical checks failed. Restore is blocked to prevent hardware damage.';
                     importErrorBox.classList.remove('hidden');
+                    importErrorBox.style.borderColor = 'rgba(239, 68, 68, 0.5)';
+                    importErrorBox.style.color = 'var(--status-danger)';
+                } else if (anyWarnings) {
+                    importErrorBox.textContent = result.reasoning || 'Warning: Potential compatibility issues detected. Proceed carefully.';
+                    importErrorBox.classList.remove('hidden');
+                    importErrorBox.style.borderColor = 'rgba(245, 158, 11, 0.5)';
+                    importErrorBox.style.color = 'var(--status-warning)';
                 } else {
                     importErrorBox.textContent = '';
                     importErrorBox.classList.add('hidden');
@@ -1923,7 +1936,8 @@ if (importFileInput) {
             }
 
             if (btnFlashDrone) {
-                btnFlashDrone.disabled = !allPass;
+                // Only disable the flash button if a CRITICAL check fails. Warnings are allowed.
+                btnFlashDrone.disabled = !allCriticalPass;
             }
 
             if (restoreStateUpload) restoreStateUpload.classList.add('hidden');
