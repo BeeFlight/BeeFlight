@@ -873,6 +873,9 @@ ${JSON.stringify(droneState.dynamics || {}, null, 2)}
 ${droneState.cliDiff || '(Not yet synced — CLI diff has not been captured yet.)'}
 \`\`\`
 
+## PART 3: Blackbox Flight Log Diagnostics
+${droneState.blackboxMetrics ? "The user recently uploaded a Blackbox flight log. Here is the FFT Analysis:\n" + JSON.stringify(droneState.blackboxMetrics, null, 2) : '(No flight log uploaded yet.)'}
+
 ## RESPONSE STYLE — MANDATORY
 - **Brevity is law.** Answer only the specific question asked in 1–3 short sentences. Never dump the entire drone state or config unless the user explicitly asks for it.
 - **Progressive disclosure.** Give the high-level answer first, then end with a one-line offer to go deeper (e.g. "Want me to break down the filter chain?").
@@ -3603,6 +3606,11 @@ You MUST respond with ONLY a valid JSON object (no markdown fences, no extra tex
   ]
 }
 
+## CURRENT DRONE CONFIGURATION (For Recommended Actions constraint mapping)
+\`\`\`
+${droneState.cliDiff || 'No CLI diff loaded. Provide generic advice.'}
+\`\`\`
+
 RULES:
 - recommendedActions MUST be an array. If no software changes are needed, use an empty array [].
 - Do NOT wrap the JSON in markdown code fences. Return raw JSON only.
@@ -3770,6 +3778,9 @@ function wireBlackboxAnalyzer() {
             }
 
             setProgress(80, 2);
+            // Save globally so the standard chat copilot can see it
+            droneState.blackboxMetrics = summary;
+
             const aiResponse = await analyzeBlackboxWithAI(summary);
             setProgress(100, 2);
 
