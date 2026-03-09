@@ -1313,12 +1313,12 @@ async function captureCliDiff() {
     const encoder = new TextEncoder();
 
     try {
-        // Enter CLI mode
-        await cliWriter.write(encoder.encode('#\n'));
-        await sleep(500);
+        // Enter CLI mode aggressively
+        await cliWriter.write(encoder.encode('#\r\n'));
+        await sleep(600);
 
-        // Send diff all
-        await cliWriter.write(encoder.encode('diff all\n'));
+        // The FC might spam a banner here. Let's send the command.
+        await cliWriter.write(encoder.encode('diff all\r\n'));
 
         // Read CLI output
         let cliOutput = '';
@@ -1343,8 +1343,10 @@ async function captureCliDiff() {
                     log.info(`CLI Chunk received (${chunk.length} chars). Total length: ${cliOutput.length}`);
 
                     // Betaflight CLI returns to '#' when a command finishes
+                    // Some builds return '# ', some return '\n#\n'. 
                     // Make sure we have enough data (not just the echo) before breaking
-                    if (cliOutput.length > 250 && cliOutput.includes('diff') && cliOutput.trimEnd().endsWith('#')) {
+                    const stripped = cliOutput.trim();
+                    if (cliOutput.length > 100 && cliOutput.includes('diff') && stripped.endsWith('#')) {
                         log.info("Found closing '#' prompt. Diff capture complete.");
                         break;
                     }
@@ -1384,16 +1386,17 @@ async function captureCliDiff() {
 
         // CRITICAL: Exit CLI mode so FC returns to MSP mode before we close the port.
         // Without this, the FC stays in CLI and ignores all MSP commands on reopen.
-        await cliWriter.write(encoder.encode('exit\n'));
+        await cliWriter.write(encoder.encode('exit\r\n'));
         log.info('Sent CLI exit command');
-        await sleep(200);
+        await sleep(400); // Give it a bit more time to process exit
 
     } catch (err) {
         log.error('CLI diff capture error', err);
         logToConsole(`CLI diff error: ${err.message}`, 'error');
         // Try to exit CLI even on error
         try {
-            await cliWriter.write(encoder.encode('exit\n'));
+            await cliWriter.write(encoder.encode('exit\r\n'));
+            await sleep(400);
         } catch (e) { }
     } finally {
         cliWriter.releaseLock();
