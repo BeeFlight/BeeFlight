@@ -111,6 +111,14 @@ const droneState = {
             dtermLowpassHz: null
         }
     },
+    launchControl: {
+        mode: 'NORMAL',
+        triggerThrottlePercent: 20,
+        angleLimit: 0
+    },
+    features: {
+        acc: true
+    },
     cliDiff: "", // Raw text from `diff all`
     cliDump: ""  // Alias used for history snapshots / restore
 };
@@ -1290,6 +1298,7 @@ async function initializeDrone() {
         renderBlackboxTab();
         renderMotorsTab();
         renderOsdTab();
+        renderConfigurationTab();
     }
 }
 
@@ -2121,23 +2130,52 @@ function updateUnsavedModesUI() {
 }
 
 async function batchFlashModes() {
-    if (!window.parsedModes || window.parsedModes.length === 0) {
-        alert("No modes to save.");
-        return;
-    }
-
     let cliCommands = "mode_color 0 0 0\n";
     let linkId = 0;
 
-    for (const m of window.parsedModes) {
-        cliCommands += `aux ${linkId} ${m.modeId} ${m.channelIndex} ${m.minRange} ${m.maxRange} 0\n`;
+    if (window.parsedModes && window.parsedModes.length > 0) {
+        for (const m of window.parsedModes) {
+            cliCommands += `aux ${linkId} ${m.modeId} ${m.channelIndex} ${m.minRange} ${m.maxRange} 0\n`;
+            linkId++;
+        }
+    }
+
+    // Explicitly clear any legacy/dangling mode links that might have been deleted
+    const oldModes = window.CliParser ? window.CliParser.parseModes(droneState.cliDiff) : [];
+    let maxOldLink = -1;
+    if (oldModes && oldModes.length > 0) {
+        maxOldLink = Math.max(...oldModes.map(m => m.linkId));
+    }
+
+    while (linkId <= maxOldLink) {
+        cliCommands += `aux ${linkId} 0 0 900 900 0\n`;
         linkId++;
     }
+
+    if (cliCommands === "mode_color 0 0 0\n" && maxOldLink === -1) {
+        alert("No modes to save or clear.");
+        return;
+    }
+
+    // --- Launch Control Fix ---
+    // Betaflight will silently reject and delete 'aux' mappings for mode 68 (Launch Control) 
+    // on reboot if the feature itself is currently disabled (launch_control_mode = NORMAL).
+    const isLaunchControlModeMapped = window.parsedModes.some(m => m.modeId === 68);
+    const lcfg = window.CliParser ? window.CliParser.parseLaunchControl(droneState.cliDiff) : null;
+
+    if (isLaunchControlModeMapped && lcfg && lcfg.mode === 'NORMAL') {
+        // Automatically set it to a valid active mode so the FC respects the 'aux' assign
+        cliCommands += "set launch_control_mode = PITCHONLY\n";
+    }
+
     cliCommands += "save\n";
 
     const btnFlash = document.getElementById('btnBatchFlashModes');
     const originalText = btnFlash ? btnFlash.textContent : 'Save & Flash Modes';
     if (btnFlash) btnFlash.textContent = "⏳ Flashing...";
+
+    console.log("[Modes Save] Batch flashing the following UI payload to drone:");
+    console.log(cliCommands);
 
     try {
         await restoreCliData(cliCommands);
@@ -2347,6 +2385,18 @@ function renderModesTab() {
     // Wire up Add Mode Dropdown
     const btnAddMode = document.getElementById('btnAddMode');
     const addModeDropdown = document.getElementById('addModeDropdown');
+    const launchControlItem = document.getElementById('addModeLaunchControl');
+
+    // Hardware support visual lockout
+    if (launchControlItem && droneState.features) {
+        if (droneState.features.launchControlSupported === false) {
+            launchControlItem.classList.add('disabled');
+            launchControlItem.title = "Firmware Update Required: Your drone was compiled without Launch Control support.";
+        } else {
+            launchControlItem.classList.remove('disabled');
+            launchControlItem.title = "";
+        }
+    }
 
     if (btnAddMode && addModeDropdown) {
         // Remove old listeners to prevent stacking
@@ -2370,7 +2420,13 @@ function renderModesTab() {
                 const mName = item.getAttribute('data-mode-name');
 
                 // Check if already exists in active bounds
-                if (window.parsedModes.find(m => m.modeId === mId)) {
+                const existingActiveMode = window.parsedModes.find(m =>
+                    m.modeId === mId &&
+                    !(m.minRange === 900 && m.maxRange === 900) &&
+                    !(m.minRange === 1000 && m.maxRange === 1000)
+                );
+
+                if (existingActiveMode) {
                     alert(`${mName} is already active.`);
                     return;
                 }
@@ -2382,8 +2438,7 @@ function renderModesTab() {
                     nextLinkId++;
                 }
 
-                // Inject default safe link: AUX1, 1300-1700
-                const cmds = `aux ${nextLinkId} ${mId} 0 1300 1700 0\nsave\n`;
+                // DO NOT flash the drone here. Just add to draft state.
                 const btnOriginalText = newBtnAddMode.textContent;
                 newBtnAddMode.textContent = '⏳ Adding...';
                 try {
@@ -2400,10 +2455,10 @@ function renderModesTab() {
                     window.parsedModes = window.parsedModes || [];
                     window.parsedModes.push(newMode);
                     hasUnsavedChanges = true;
+                    console.log(`[Modes] Added mode ${mName} (ID: ${mId}, Link: ${nextLinkId}) to draft state. Waiting for batch flash.`);
                     renderModesTab();
                     updateUnsavedModesUI();
 
-                    await restoreCliData(cmds);
                 } catch (err) {
                     log.error('Add mode failed', err);
                 } finally {
@@ -2519,7 +2574,17 @@ function renderModesTab() {
 // Write the compiled mode link to the drone
 async function updateModeLinkCli(linkId, modeId, auxIndex, minBound, maxBound) {
     // Mode format: aux <linkId> <modeId> <auxChannel> <min> <max> <reserved>
-    const cmds = `aux ${linkId} ${modeId} ${auxIndex} ${minBound} ${maxBound} 0\nsave\n`;
+    let cmds = `aux ${linkId} ${modeId} ${auxIndex} ${minBound} ${maxBound} 0\n`;
+
+    // --- Launch Control Fix ---
+    if (modeId === 68) {
+        const lcfg = window.CliParser ? window.CliParser.parseLaunchControl(droneState.cliDiff) : null;
+        if (lcfg && lcfg.mode === 'NORMAL') {
+            cmds += "set launch_control_mode = PITCHONLY\n";
+        }
+    }
+
+    cmds += "save\n";
     try {
         await restoreCliData(cmds);
     } catch (e) {
@@ -2642,6 +2707,115 @@ async function fetchRcData() {
         return droneState.live?.rc || null; // fallback to last known
     }
 }
+
+
+// ---------------------------------------------------------
+// Configuration Tab Rendering (Launch Control)
+// ---------------------------------------------------------
+function renderConfigurationTab() {
+    if (!window.CliParser || !droneState.cliDiff) return;
+
+    droneState.features = window.CliParser.parseFeatures(droneState.cliDiff);
+    droneState.launchControl = window.CliParser.parseLaunchControl(droneState.cliDiff);
+
+    const lcfg = droneState.launchControl;
+    const lcPanel = document.getElementById('launch-control-panel');
+
+    if (!lcfg || !lcfg.mode) {
+        if (lcPanel) lcPanel.style.display = 'none';
+        return; // firmware doesn't support launch control
+    } else {
+        if (lcPanel) lcPanel.style.display = 'block'; // ensure it's visible
+    }
+
+    // UI Setup
+    const modeSelect = document.getElementById('launchModeSelect');
+    if (modeSelect) modeSelect.value = lcfg.mode;
+
+    const throttleSlider = document.getElementById('launchThrottleSlider');
+    const throttleVal = document.getElementById('launchThrottleValue');
+    if (throttleSlider && throttleVal) {
+        throttleSlider.value = lcfg.triggerThrottlePercent;
+        throttleVal.textContent = lcfg.triggerThrottlePercent + '%';
+
+        throttleSlider.addEventListener('input', (e) => {
+            throttleVal.textContent = e.target.value + '%';
+        });
+    }
+
+    const angleSlider = document.getElementById('launchAngleSlider');
+    const angleVal = document.getElementById('launchAngleValue');
+    if (angleSlider && angleVal) {
+        angleSlider.value = lcfg.angleLimit;
+        angleVal.textContent = lcfg.angleLimit + '°';
+
+        angleSlider.addEventListener('input', (e) => {
+            angleVal.textContent = e.target.value + '°';
+        });
+    }
+
+    // Guardrail Check
+    const warningBanner = document.getElementById('accWarningBanner');
+    if (warningBanner) {
+        if (!droneState.features.acc) {
+            warningBanner.classList.remove('hidden');
+        } else {
+            warningBanner.classList.add('hidden');
+        }
+    }
+}
+
+// ---------------------------------------------------------
+// Global Event Listeners for Configuration Tab
+// ---------------------------------------------------------
+document.addEventListener('DOMContentLoaded', () => {
+    const btnSaveLaunchControl = document.getElementById('btnSaveLaunchControl');
+    if (btnSaveLaunchControl) {
+        btnSaveLaunchControl.addEventListener('click', async () => {
+            const mode = document.getElementById('launchModeSelect').value;
+            const throttle = document.getElementById('launchThrottleSlider').value;
+            const angle = document.getElementById('launchAngleSlider').value;
+
+            // Batch CLI commands
+            let cmds = [
+                `set launch_control_mode = ${mode}`,
+                `set launch_trigger_throttle_percent = ${throttle}`,
+                `set launch_angle_limit = ${angle}`
+            ];
+
+            // Setup mode mapping for AUX switch if not already matched
+            // Look for existing MODE 68 logic or just save. The user handles mode mappings in the Modes Tab, 
+            // but the prompt specifies: "Ensure these are batched with the set aux command for the Launch Control switch itself." 
+            // Wait, we can pull the active Launch Control link from parsedModes, or inject a default link.
+            // If the user hasn't set it, we will just use save, and assume the Modes Tab handles the aux definition. 
+            // Better yet, let's capture the existing aux mappings for mode 68 and re-issue them so they are explicitly batched!
+
+            if (window.parsedModes) {
+                const lcModes = window.parsedModes.filter(m => m.modeId === 68);
+                lcModes.forEach(m => {
+                    cmds.push(`aux ${m.linkId} ${m.modeId} ${m.channelIndex} ${m.minRange} ${m.maxRange} 0`);
+                });
+            }
+
+            cmds.push('save');
+
+            const commandsList = cmds.join('\\n');
+
+            showToast('Saving Launch Control Configuration...', 'info');
+            btnSaveLaunchControl.disabled = true;
+
+            try {
+                await restoreCliData(commandsList);
+                showToast('Launch Control saved successfully!', 'success');
+            } catch (err) {
+                log.error('Failed to save Launch Control', err);
+                showToast('Failed to save Launch Control', 'error');
+            } finally {
+                btnSaveLaunchControl.disabled = false;
+            }
+        });
+    }
+});
 
 
 // ---------------------------------------------------------
