@@ -33,6 +33,13 @@ Enforce the phased roadmap. Ensure **Phase 1** (Web Serial Connection & MSP pars
 - AI responses are displayed in the chat UI.
 - Prompt engineering produces accurate, safe recommendations.
 
+### Phase 3 — Advanced AI Diagnostics & UX Polish
+- **Do NOT begin until Phase 2 is fully signed off.**
+- **Blackbox AI Analysis**: Parse `.bbl` files and feed flight logs to Gemini to diagnose propwash, hot motors, and filter issues.
+- **Tuning Templates**: Activate the "Cinematic," "Freestyle," and "Race" preset buttons using AI to tailor the tune to the specific quadcopter size/weight.
+- **Chat UX Polish**: Implement streaming responses, markdown rendering (tables/bolding), and robust conversation history.
+- **Context Optimization**: Refine what data is sent to the LLM to save tokens and improve response speed.
+
 ## Behavior
 
 - Always ask: "Is Phase 1 done?" before approving any Phase 2 work.

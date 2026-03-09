@@ -497,6 +497,7 @@ function appendChatMessage(role, text) {
     }
     chatContainer.appendChild(d);
     chatContainer.scrollTop = chatContainer.scrollHeight;
+    return d; // Return the element so streaming can update it
 } // end function appendChatMessage
 
 /**
@@ -919,17 +920,57 @@ When the user asks you to change a configuration setting (PIDs, rates, filters, 
 Do not include any additional fields. Do not wrap the JSON in markdown besides the single \`\`\`action fence. All CLI commands must be in the commands array only.`;
 
     try {
-        const responseText = await window.generateAIResponse(getActiveProviderType(), activeModelId, systemPrompt, userText, apiKey);
-        renderAiResponse(responseText);
+        let fullResponse = '';
+        // Create an empty AI message bubble immediately
+        const aiBubble = appendChatMessage('ai', '');
+
+        await window.generateAIResponseStream(getActiveProviderType(), activeModelId, systemPrompt, userText, apiKey, (chunk, isDone) => {
+            if (chunk) {
+                fullResponse += chunk;
+                // Render markdown live, but strip out the action JSON blocks so they don't look ugly while streaming
+                const displayHtml = fullResponse.replace(/```action[\s\S]*?(```|$)/g, '*Generating Action Card...*');
+                if (typeof marked !== 'undefined') {
+                    aiBubble.innerHTML = marked.parse(displayHtml);
+                } else {
+                    aiBubble.textContent = displayHtml;
+                }
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+            if (isDone) {
+                // Now that the stream is completely finished, check if there's an action card to append
+                thinkingIndicator.classList.add('hidden');
+                chatInput.disabled = false;
+                sendBtn.disabled = false;
+                chatInput.focus();
+
+                const actionFence = '```action';
+                const fenceIndex = fullResponse.indexOf(actionFence);
+                if (fenceIndex !== -1) {
+                    // Extract the final conversational text (before the JSON)
+                    const beforeText = fullResponse.slice(0, fenceIndex).trim();
+                    if (typeof marked !== 'undefined') {
+                        aiBubble.innerHTML = marked.parse(beforeText || "I've generated an Action Card for you.");
+                    } else {
+                        aiBubble.textContent = beforeText || "I've generated an Action Card for you.";
+                    }
+
+                    // Render the interactive card below the text (reusing existing Action Card logic)
+                    renderAiResponse(fullResponse);
+                } else {
+                    // Final markdown render if no card
+                    if (typeof marked !== 'undefined') {
+                        aiBubble.innerHTML = marked.parse(fullResponse);
+                    }
+                }
+            }
+        });
     } catch (err) {
         log.error('AI API call failed', err);
         logToConsole(`AI copilot error: ${err.message}`, 'error');
-        appendChatMessage('ai', `Error reaching AI provider. Check console logs.`);
-    } finally {
+        appendChatMessage('ai', `Error reaching AI provider: ${err.message}. Check console logs.`);
         thinkingIndicator.classList.add('hidden');
         chatInput.disabled = false;
         sendBtn.disabled = false;
-        chatInput.focus();
     }
 }
 

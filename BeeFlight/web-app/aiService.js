@@ -116,5 +116,117 @@ async function generateAIResponse(providerType, modelId, systemPrompt, userText,
     return _normalizeResponse(providerType, responseJSON);
 }
 
+// --- Streaming Implementation ---
+
+/**
+ * Generate an AI response using a stream for real-time text delivery.
+ * @param {string} providerType - The provider key (e.g. 'google')
+ * @param {string} modelId - The model identifier string
+ * @param {string} systemPrompt - System instructions
+ * @param {string} userText - User message content
+ * @param {string} apiKey - The API key for the provider
+ * @param {function} onChunk - Callback function receiving (chunkText, isDone)
+ */
+async function generateAIResponseStream(providerType, modelId, systemPrompt, userText, apiKey, onChunk) {
+    if (!providerType || !modelId) throw new Error("AI provider or model not selected.");
+    if (!apiKey) throw new Error("API Key is missing for the selected provider.");
+
+    let url = '';
+    let headers = {};
+    let payload = {};
+
+    if (providerType === 'google') {
+        url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:streamGenerateContent?alt=sse`;
+        headers = {
+            "Content-Type": "application/json",
+            "x-goog-api-key": apiKey
+        };
+        payload = {
+            "systemInstruction": { "parts": [{ "text": systemPrompt }] },
+            "contents": [{ "role": "user", "parts": [{ "text": userText }] }]
+        };
+    } else if (['openai', 'grok', 'groq'].includes(providerType)) {
+        if (providerType === 'openai') url = 'https://api.openai.com/v1/chat/completions';
+        if (providerType === 'grok') url = 'https://api.x.ai/v1/chat/completions';
+        if (providerType === 'groq') url = 'https://api.groq.com/openai/v1/chat/completions';
+
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`
+        };
+        const actualModel = providerType === 'groq' ? 'llama-3.3-70b-versatile' : modelId;
+        payload = {
+            "model": actualModel,
+            "stream": true,
+            "messages": [
+                { "role": "system", "content": systemPrompt },
+                { "role": "user", "content": userText }
+            ],
+            "max_tokens": 2048
+        };
+    } else {
+        throw new Error(`Streaming not yet supported for provider: ${providerType}`);
+    }
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+        throw new Error(`${providerType} Streaming API Error: ${response.status} ${response.statusText}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buffer = "";
+
+    try {
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+                onChunk("", true);
+                break;
+            }
+            buffer += decoder.decode(value, { stream: true });
+
+            let lines = buffer.split('\n');
+            buffer = lines.pop(); // keep the last incomplete chunk in buffer
+
+            for (let line of lines) {
+                line = line.trim();
+                // Process SSE "data: ..." lines
+                if (line.startsWith('data: ')) {
+                    const dataStr = line.slice(6);
+                    if (dataStr === '[DONE]') continue;
+
+                    try {
+                        const parsed = JSON.parse(dataStr);
+                        let chunkText = "";
+
+                        // provider-specific parsing of the chunk
+                        if (providerType === 'google') {
+                            chunkText = parsed.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                        } else {
+                            chunkText = parsed.choices?.[0]?.delta?.content || "";
+                        }
+
+                        if (chunkText) {
+                            onChunk(chunkText, false);
+                        }
+                    } catch (e) {
+                        console.warn("Error parsing stream chunk:", e, dataStr);
+                    }
+                }
+            }
+        }
+    } catch (err) {
+        console.error("Stream reading error:", err);
+        throw err;
+    }
+}
+
 // Attach to window for global access
 window.generateAIResponse = generateAIResponse;
+window.generateAIResponseStream = generateAIResponseStream;
