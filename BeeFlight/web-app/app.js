@@ -1331,12 +1331,13 @@ async function captureCliDiff() {
                 const result = await Promise.race([readPromise, timeoutPromise]);
 
                 if (result.done) {
-                    log.info('CLI stream EOF reached');
+                    logToConsole('CLI stream EOF reached', 'warning');
                     break;
                 }
-                if (result.value) {
+                if (result.value && result.value.byteLength > 0) {
                     const chunk = decoder.decode(result.value);
                     cliOutput += chunk;
+                    logToConsole(`[RX Chunk]: ${chunk.length} chars. Total: ${cliOutput.length}`, 'rx');
 
                     if (stage === 'ENTER_CLI') {
                         // Wait for the FC to print its banner and land on a '#' prompt (or if it's already there)
@@ -1357,7 +1358,7 @@ async function captureCliDiff() {
                     }
                 } else if (result.timeout && stage === 'ENTER_CLI') {
                     // Sometimes the drone is already in CLI but silent, or missed the #. Resend it gently.
-                    log.info('Timeout waiting for prompt, resending #...');
+                    logToConsole('Timeout waiting for prompt. Resending # (DTR asserted)...', 'warning');
                     await cliWriter.write(encoder.encode('\r\n#\r\n'));
                 }
             }
