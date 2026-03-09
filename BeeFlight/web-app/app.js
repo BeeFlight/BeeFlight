@@ -1313,19 +1313,16 @@ async function captureCliDiff() {
     const encoder = new TextEncoder();
 
     try {
-        // Enter CLI mode aggressively
-        await cliWriter.write(encoder.encode('#\r\n'));
-        await sleep(600);
-
-        // The FC might spam a banner here. Let's send the command.
-        await cliWriter.write(encoder.encode('diff all\r\n'));
-
-        // Read CLI output
-        let cliOutput = '';
         const cliReader = port.readable.getReader();
         const decoder = new TextDecoder();
-        const deadline = Date.now() + 10000; // Give diff all up to 10s to stream
+        let cliOutput = '';
+        let stage = 'ENTER_CLI';
 
+        // Enter CLI mode aggressively
+        await cliWriter.write(encoder.encode('#\r\n'));
+        log.info('Sent # to enter CLI');
+
+        const deadline = Date.now() + 15000; // Give 15s total for safety
         log.info('Starting CLI stream read loop...');
         try {
             while (Date.now() < deadline) {
@@ -1340,16 +1337,28 @@ async function captureCliDiff() {
                 if (result.value) {
                     const chunk = decoder.decode(result.value);
                     cliOutput += chunk;
-                    log.info(`CLI Chunk received (${chunk.length} chars). Total length: ${cliOutput.length}`);
 
-                    // Betaflight CLI returns to '#' when a command finishes
-                    // Some builds return '# ', some return '\n#\n'. 
-                    // Make sure we have enough data (not just the echo) before breaking
-                    const stripped = cliOutput.trim();
-                    if (cliOutput.length > 100 && cliOutput.includes('diff') && stripped.endsWith('#')) {
-                        log.info("Found closing '#' prompt. Diff capture complete.");
-                        break;
+                    if (stage === 'ENTER_CLI') {
+                        // Wait for the FC to print its banner and land on a '#' prompt (or if it's already there)
+                        if (cliOutput.trimEnd().endsWith('#')) {
+                            log.info('FC CLI prompt detected. Sending "diff all"...');
+                            // Clear output to cleanly capture just the diff
+                            cliOutput = '';
+                            await cliWriter.write(encoder.encode('diff all\r\n'));
+                            stage = 'WAITING_DIFF';
+                        }
+                    } else if (stage === 'WAITING_DIFF') {
+                        const stripped = cliOutput.trim();
+                        // wait for it to process the command and return a new prompt
+                        if (cliOutput.length > 50 && cliOutput.includes('diff') && stripped.endsWith('#')) {
+                            log.info("Found closing '#' prompt. Diff capture complete.");
+                            break;
+                        }
                     }
+                } else if (result.timeout && stage === 'ENTER_CLI') {
+                    // Sometimes the drone is already in CLI but silent, or missed the #. Resend it gently.
+                    log.info('Timeout waiting for prompt, resending #...');
+                    await cliWriter.write(encoder.encode('\r\n#\r\n'));
                 }
             }
         } finally {
