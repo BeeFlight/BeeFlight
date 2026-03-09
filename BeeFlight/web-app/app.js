@@ -1665,7 +1665,7 @@ async function connectToDrone() {
         isReconnectingAfterCli = true;
         logToConsole('Waiting for FC to reboot... Do not unplug.', 'info');
 
-        // Fallback if re-enumeration fails or takes too long (10 seconds)
+        // Fallback if re-enumeration fails or takes too long (5 seconds max per QA rules)
         setTimeout(() => {
             if (isReconnectingAfterCli) {
                 isReconnectingAfterCli = false;
@@ -1673,7 +1673,7 @@ async function connectToDrone() {
                 logToConsole('Reconnect timeout. Please click Connect manually.', 'error');
                 syncOverlay.classList.add('hidden');
             }
-        }, 10000);
+        }, 5000);
 
     } catch (err) {
         log.error('CLI phase failed', err);
