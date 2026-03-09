@@ -2415,6 +2415,13 @@ function renderModesTab() {
         addModeDropdown.querySelectorAll('.dropdown-item').forEach(item => {
             item.addEventListener('click', async (e) => {
                 e.stopPropagation();
+
+                // Block if this mode requires hardware support the drone lacks
+                if (item.classList.contains('disabled')) {
+                    alert(item.title || "This feature is not supported by your current firmware.");
+                    return;
+                }
+
                 addModeDropdown.classList.add('hidden');
                 const mId = parseInt(item.getAttribute('data-mode-id'));
                 const mName = item.getAttribute('data-mode-name');
