@@ -135,7 +135,8 @@ class CliParser {
             39: 'VTX PIT MODE',
             40: 'PARALYZE',
             41: 'PREARM',
-            42: 'GPS RESCUE'
+            42: 'GPS RESCUE',
+            68: 'LAUNCH CONTROL'
         };
 
         // Regex to match: aux [linkId] [modeId] [channelIndex] [minRange] [maxRange] ...
@@ -152,7 +153,7 @@ class CliParser {
                 const maxRange = parseInt(match[5], 10);
 
                 // Filter out disabled/unused modes (Betaflight sets these to 900 900 or 1000 1000)
-                if (minRange === maxRange || minRange > 2100 || maxRange < 900) {
+                if ((minRange === 900 && maxRange === 900) || (minRange === 1000 && maxRange === 1000) || minRange > 2100 || maxRange < 900) {
                     return; // Skip this line, mode is inactive
                 }
 
@@ -558,6 +559,71 @@ class CliParser {
             config.systemType = 'Unknown';
             config.protocolLabel = 'Unknown / No VTX Detected';
         }
+
+        return config;
+    }
+
+    /**
+     * Parses the raw `diff all` text and extracts feature flags (e.g., ACC, MOTOR_STOP).
+     * @param {string} cliText The raw output of `diff all`
+     * @returns {Object} Object containing feature boolean flags (e.g., { acc: true, gps: false })
+     */
+    static parseFeatures(cliText) {
+        if (!cliText) return {};
+
+        const features = {
+            acc: true // Typically enabled by default unless specifically disabled
+        };
+
+        const lines = cliText.split('\n');
+
+        lines.forEach(line => {
+            const cleanLine = line.trim();
+            if (cleanLine.startsWith('feature ')) {
+                const featureName = cleanLine.substring(8).trim();
+                if (featureName.startsWith('-')) {
+                    features[featureName.substring(1).toLowerCase()] = false;
+                } else {
+                    features[featureName.toLowerCase()] = true;
+                }
+            }
+        });
+
+        // Firmware Support Check (Did they compile Betaflight with Launch Control?)
+        features.launchControlSupported = cliText.includes('launch_control_mode');
+
+        return features;
+    }
+
+    /**
+     * Parses the raw `diff all` text and extracts Launch Control configuration.
+     * @param {string} cliText The raw output of `diff all`
+     * @returns {Object} Object containing Launch Control properties
+     */
+    static parseLaunchControl(cliText) {
+        if (!cliText) return null;
+
+        const config = {
+            mode: 'NORMAL',
+            triggerThrottlePercent: 20,
+            angleLimit: 0
+        };
+
+        const lines = cliText.split('\n');
+
+        lines.forEach(line => {
+            const cleanLine = line.trim();
+            if (cleanLine.startsWith('set launch_control_mode')) {
+                const parts = cleanLine.split('=');
+                if (parts.length === 2) config.mode = parts[1].trim();
+            } else if (cleanLine.startsWith('set launch_trigger_throttle_percent')) {
+                const parts = cleanLine.split('=');
+                if (parts.length === 2) config.triggerThrottlePercent = parseInt(parts[1].trim(), 10) || 20;
+            } else if (cleanLine.startsWith('set launch_angle_limit')) {
+                const parts = cleanLine.split('=');
+                if (parts.length === 2) config.angleLimit = parseInt(parts[1].trim(), 10) || 0;
+            }
+        });
 
         return config;
     }

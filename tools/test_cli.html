@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>CLI Debugger</title>
+</head>
+
+<body>
+    <button id="btn">Connect</button>
+    <pre id="out"></pre>
+    <script>
+        document.getElementById('btn').addEventListener('click', async () => {
+            const out = document.getElementById('out');
+            function log(msg) { out.textContent += msg + '\n'; console.log(msg); }
+
+            try {
+                const port = await navigator.serial.requestPort();
+                await port.open({ baudRate: 115200 });
+                log('Port opened.');
+
+                const writer = port.writable.getWriter();
+                const encoder = new TextEncoder();
+
+                const reader = port.readable.getReader();
+                const decoder = new TextDecoder();
+                let output = '';
+                let stage = 0;
+
+                await writer.write(encoder.encode('#\r\n'));
+                log('Sent: #');
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+
+                    const text = decoder.decode(value);
+                    output += text;
+                    log(`[RX]: ${text.trim()}`);
+
+                    // A naive "if we hit prompt, send diff"
+                    if (stage === 0 && output.trimEnd().endsWith('#')) {
+                        log('Prompt hit! Sending diff all...');
+                        stage = 1;
+                        await writer.write(encoder.encode('diff all\r\n'));
+                    }
+                }
+            } catch (e) {
+                log('Error: ' + e);
+            }
+        });
+    </script>
+</body>
+
+</html>

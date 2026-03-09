@@ -130,9 +130,75 @@
                                 </ul>
                             </div>
                         </div>
-                        <div id="view-configuration" class="tab-view">
+                        <div id="view-configuration" class="tab-view dashboard-cards">
                             <h2 class="tab-title">Configuration</h2>
-                            <p class="tab-placeholder">System configuration limits and features coming soon...</p>
+
+                            <!-- Launch Control -->
+                            <div id="launch-control-panel" class="data-card card-wide">
+                                <div class="card-header">Launch Control</div>
+                                <div class="card-body">
+                                    <div id="accWarningBanner" class="acc-warning-banner hidden">
+                                        ⚠️ Accelerometer is disabled. Launch Control requires the accelerometer to be
+                                        enabled in the Configuration tab to calculate pitch angle.
+                                    </div>
+                                    <div class="launch-control-grid"
+                                        style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 10px;">
+                                        <div class="input-group">
+                                            <label for="launchModeSelect" class="data-label"
+                                                style="display:block; margin-bottom:5px;">Launch Mode</label>
+                                            <select id="launchModeSelect" class="lc-select"
+                                                style="width:100%; padding:8px; border-radius:4px; border:1px solid var(--border-subtle); background:var(--bg-panel); color:var(--text-primary);">
+                                                <option value="NORMAL">NORMAL</option>
+                                                <option value="PITCHONLY">PITCHONLY</option>
+                                                <option value="FULL">FULL</option>
+                                            </select>
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="launchThrottleSlider" class="data-label"
+                                                style="display:block; margin-bottom:5px;">Trigger Throttle: <span
+                                                    id="launchThrottleValue">20%</span></label>
+                                            <div class="slider-wrapper">
+                                                <input type="range" id="launchThrottleSlider" min="0" max="50" step="1"
+                                                    value="20" style="width:100%;">
+                                            </div>
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="launchAngleSlider" class="data-label"
+                                                style="display:flex; align-items:center; margin-bottom:5px;">
+                                                Pitch Angle: <span id="launchAngleValue"
+                                                    style="margin-left:4px;">0°</span>
+                                                <div class="info-tooltip">
+                                                    <span class="info-icon">ℹ️</span>
+                                                    <div class="tooltip-content">
+                                                        <strong>🏎️ Dedicated Racing Drones</strong> (Bottom-mounted
+                                                        battery)<br>
+                                                        • Beginner/Intermediate: 35° to 45°<br>
+                                                        • Pro Racers: 50° to 60°+<br><br>
+
+                                                        <strong>🛹 Freestyle Drones</strong> (Top-mounted battery)<br>
+                                                        • Recommendation: 20° to 30°<br>
+                                                        *(Keep it low! Top-heavy drones will tip forward and grind props
+                                                        if set too high)*<br><br>
+
+                                                        <strong>🎥 Cinewhoops</strong><br>
+                                                        • Recommendation: Not Recommended.<br>
+                                                        *(Ducts catch ground effect making Launch Control highly
+                                                        unstable. Max 10°-15° if forced)*
+                                                    </div>
+                                                </div>
+                                            </label>
+                                            <div class="slider-wrapper">
+                                                <input type="range" id="launchAngleSlider" min="0" max="90" step="1"
+                                                    value="0" style="width:100%;">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="launch-actions" style="margin-top:20px; text-align:right;">
+                                        <button id="btnSaveLaunchControl" class="btn-primary">Save Launch
+                                            Control</button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div id="view-power" class="tab-view dashboard-cards">
                             <!-- Live Telemetry -->
@@ -429,6 +495,10 @@
                                         <div class="dropdown-item" data-mode-id="26" data-mode-name="BLACKBOX">BLACKBOX
                                         </div>
                                         <div class="dropdown-item" data-mode-id="28" data-mode-name="AIRMODE">AIRMODE
+                                        </div>
+                                        <div class="dropdown-item" id="addModeLaunchControl" data-mode-id="68"
+                                            data-mode-name="LAUNCH CONTROL">
+                                            LAUNCH CONTROL
                                         </div>
                                     </div>
                                 </div>

@@ -1787,6 +1787,13 @@
     color: var(--accent);
 }
 
+.dropdown-item.disabled {
+    color: rgba(148, 163, 184, 0.4);
+    pointer-events: none;
+    cursor: not-allowed;
+    background: transparent;
+}
+
 /* Mode Card */
 .mode-card-modern {
     background: rgba(15, 23, 42, 0.6);
@@ -2128,4 +2135,179 @@
     to {
         transform: rotate(360deg);
     }
+}
+
+/* =========================================================
+   Launch Control Setup UI
+   ========================================================= */
+.acc-warning-banner {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid var(--status-danger);
+    color: var(--status-danger);
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.acc-warning-banner.hidden {
+    display: none;
+}
+
+.lc-select {
+    width: 100%;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-input);
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    cursor: pointer;
+}
+
+.lc-select:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.lc-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    outline: none;
+}
+
+.lc-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent-blue);
+    cursor: pointer;
+    transition: transform 0.1s;
+}
+
+.lc-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}
+
+.acc-warning-banner {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid var(--status-danger);
+    color: var(--status-danger);
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.acc-warning-banner.hidden {
+    display: none;
+}
+
+.lc-select {
+    width: 100%;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-input);
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    cursor: pointer;
+}
+
+.lc-select:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.lc-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    outline: none;
+}
+
+.lc-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent-blue);
+    cursor: pointer;
+    transition: transform 0.1s;
+}
+
+.lc-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}
+
+/* Pitch Angle Tooltip */
+.info-tooltip {
+    position: relative;
+    display: inline-block;
+    margin-left: 6px;
+    cursor: help;
+}
+
+.info-icon {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    transition: color 0.2s;
+}
+
+.info-tooltip:hover .info-icon {
+    color: var(--accent-blue);
+}
+
+.tooltip-content {
+    visibility: hidden;
+    opacity: 0;
+    width: 320px;
+    background-color: var(--bg-app);
+    color: var(--text-primary);
+    text-align: left;
+    border-radius: 8px;
+    padding: 12px;
+    position: absolute;
+    z-index: 100;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+    box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.4);
+    border: 1px solid var(--border-subtle);
+    font-weight: normal;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    transition: opacity 0.2s, visibility 0.2s;
+}
+
+.tooltip-content::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -6px;
+    border-width: 6px;
+    border-style: solid;
+    border-color: var(--border-subtle) transparent transparent transparent;
+}
+
+.info-tooltip:hover .tooltip-content {
+    visibility: visible;
+    opacity: 1;
 }
