@@ -429,51 +429,43 @@
 /* =========================================================
    BLACKBOX TAB (Phase 11)
    ========================================================= */
-.blackbox-intents {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
-    margin-bottom: 20px;
+.bb-workflow-card {
+    background: var(--surface-light);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s;
 }
 
-.intent-card {
-    background: var(--bg-panel);
-    border: 2px solid var(--border-subtle);
-    border-radius: 10px;
-    padding: 24px 16px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.25s ease;
+.bb-workflow-card:hover {
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+    border-color: rgba(148, 163, 184, 0.3);
 }
 
-.intent-card:hover {
-    border-color: var(--accent);
-    transform: translateY(-3px);
-    box-shadow: 0 6px 20px rgba(0, 240, 255, 0.15);
+.bb-workflow-card .card-header {
+    background: rgba(15, 23, 42, 0.4);
+    border-bottom: 1px solid var(--border-color);
+    padding: 16px 20px;
+    border-radius: 12px 12px 0 0;
 }
 
-.intent-card.selected {
-    border-color: var(--accent);
-    background: rgba(0, 240, 255, 0.08);
-    box-shadow: 0 0 20px rgba(0, 240, 255, 0.2);
+.bb-workflow-card .card-body {
+    padding: 20px;
 }
 
-.intent-icon {
-    font-size: 2.5rem;
-    margin-bottom: 10px;
-}
-
-.intent-card h3 {
-    font-size: 1.05rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: 0 0 6px 0;
-}
-
-.intent-card p {
-    font-size: 0.85rem;
-    color: var(--text-muted);
-    margin: 0;
+.step-badge {
+    background: var(--accent-purple);
+    color: white;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    font-weight: bold;
+    box-shadow: 0 2px 5px rgba(138, 43, 226, 0.4);
 }
 
 .blackbox-storage .card-body {
@@ -2310,4 +2302,93 @@
 .info-tooltip:hover .tooltip-content {
     visibility: visible;
     opacity: 1;
+}
+
+/* =========================================================
+   Rates 3D Visualizer (Phase 4)
+   ========================================================= */
+
+.rates-visualizer-row {
+    display: flex;
+    gap: 16px;
+    align-items: stretch;
+}
+
+.rates-2d-col {
+    flex: 1;
+    min-width: 0;
+}
+
+.rates-3d-col {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.scene-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: 200px;
+    background: #0f172a;
+    border-radius: 8px;
+    border: 1px solid var(--border-subtle);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.scene-container canvas {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+    outline: none;
+}
+
+.scene-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 20px;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    font-weight: 500;
+    z-index: 10;
+    transition: opacity 0.3s;
+}
+
+.scene-overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.btn-reset-3d {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(4px);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    z-index: 5;
+    transition: all 0.2s;
+}
+
+.btn-reset-3d:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--text-muted);
 }

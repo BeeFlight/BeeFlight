@@ -110,16 +110,23 @@ class CliParser {
      * Example: aux 0 0 1300 1700 0 0 (ARM on Aux 1)
      * 
      * @param {string} cliText The raw output of `diff all`
+     * @param {Object} dynamicMap The MSP Box mapping from droneState.dynamicModeMap
      * @returns {Array} Array of parsed mode mapping objects
      */
-    static parseModes(cliText) {
+    static parseModes(cliText, dynamicMap = {}) {
         if (!cliText) return [];
 
         const modes = [];
         const lines = cliText.split('\n');
 
-        // Common Betaflight Mode IDs
-        const MODE_NAMES = {
+        // Create a reverse lookup dictionary from the dynamicMap (value -> key)
+        const reverseMap = {};
+        for (const [name, id] of Object.entries(dynamicMap)) {
+            reverseMap[id] = name;
+        }
+
+        // Common Betaflight Mode IDs (Fallback for unsupported FCs / Jumbo Frames)
+        const FALLBACK_MODE_NAMES = {
             0: 'ARM',
             1: 'ANGLE',
             2: 'HORIZON',
@@ -163,7 +170,7 @@ class CliParser {
                     return;
                 }
 
-                const modeName = MODE_NAMES[modeId] || `MODE ${modeId}`;
+                const modeName = reverseMap[modeId] || FALLBACK_MODE_NAMES[modeId] || `UNSUPPORTED MODE ID (${modeId})`;
                 const channelName = `AUX ${channelIndex + 1}`;
 
                 modes.push({

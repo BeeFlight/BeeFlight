@@ -1047,6 +1047,16 @@ function parseMspFrame(cmd, payload) {
             if (a) droneState.live.analog = a;
             break;
         }
+        case MSP.MSP_BOXNAMES: {
+            droneState.boxNames = MSP.parseBoxNames(payload);
+            checkAndBuildDynamicModeMap();
+            break;
+        }
+        case MSP.MSP_BOXIDS: {
+            droneState.boxIds = MSP.parseBoxIds(payload);
+            checkAndBuildDynamicModeMap();
+            break;
+        }
         default:
             break;
         case MSP.MSP_MOTOR_TELEMETRY: {
@@ -1056,6 +1066,24 @@ function parseMspFrame(cmd, payload) {
                 if (window.Drone3D) window.Drone3D.updateRPMs(mt.rpms);
             }
             break;
+        }
+    }
+}
+
+function checkAndBuildDynamicModeMap() {
+    // Only build if we have received both arrays from the FC
+    if (droneState.boxNames && droneState.boxIds && !droneState.dynamicModeMap) {
+        droneState.dynamicModeMap = {};
+        droneState.boxNames.forEach((name, index) => {
+            if (index < droneState.boxIds.length) {
+                droneState.dynamicModeMap[name] = droneState.boxIds[index];
+            }
+        });
+        logToConsole(`Built dynamic mode map with ${Object.keys(droneState.dynamicModeMap).length} modes.`, 'success');
+
+        // If the CLI diff has already been parsed, we can finally render the Modes UI tab
+        if (droneState.cliDiff && typeof renderModesTab === 'function') {
+            renderModesTab();
         }
     }
 }
@@ -1311,11 +1339,29 @@ async function initializeDrone() {
     await sendMspCommand(MSP.MSP_API_VERSION);
     await sleep(250);
     await sendMspCommand(MSP.MSP_FC_VARIANT);
-    await sleep(250);
     await sendMspCommand(MSP.MSP_FC_VERSION);
     await sleep(250);
-    await sendMspCommand(MSP.MSP_PID);
+
+    // Fetch dynamic Box Names and IDs
+    await sendMspCommand(MSP.MSP_BOXNAMES);
+    await sendMspCommand(MSP.MSP_BOXIDS);
+
+    // Provide a fallback in case the FC drops or unsupported
+    setTimeout(() => {
+        if (!droneState.dynamicModeMap) {
+            if (typeof logToConsole !== 'undefined') {
+                logToConsole('Dynamic Mode Map unsupported by FC. Falling back to static map.', 'warning');
+            }
+            droneState.dynamicModeMap = {};
+            if (droneState.cliDiff && typeof renderModesTab === 'function') {
+                renderModesTab();
+            }
+        }
+    }, 1500);
+
     await sleep(250);
+
+    await sendMspCommand(MSP.MSP_PID);
     await sendMspCommand(MSP.MSP_STATUS);
     await sleep(500);
 
@@ -1335,7 +1381,7 @@ async function initializeDrone() {
     // Render the Config Tabs from CLI data
     if (droneState.cliDiff && window.CliParser) {
         renderPortsTab();
-        renderModesTab();
+        // renderModesTab() is deferred to checkAndBuildDynamicModeMap()
         renderPowerTab();
         renderPidTab();
         renderVtxTab();
@@ -1813,7 +1859,15 @@ sidebarItems.forEach(item => {
         const viewElement = document.getElementById(viewId);
         if (viewElement) viewElement.classList.add('active');
 
+        // Phase 5/11 logic
         if (viewId === 'view-blackbox') renderBlackboxTab();
+
+        // Phase 4: Rates 3D Visualizer
+        if (viewId === 'view-rates') {
+            if (typeof initRates3D === 'function') initRates3D();
+        } else {
+            if (typeof stopRates3D === 'function') stopRates3D();
+        }
         if (viewId === 'view-pids') {
             wireRatesEngine();
             setTimeout(() => { updateMaxValues(); drawRateCurve(); }, 50);
@@ -2224,15 +2278,28 @@ async function batchFlashModes() {
     let cliCommands = "mode_color 0 0 0\n";
     let linkId = 0;
 
+    if (!droneState.dynamicModeMap) {
+        alert("Dynamic mode map not loaded. Please reconnect the drone.");
+        return;
+    }
+
     if (window.parsedModes && window.parsedModes.length > 0) {
         for (const m of window.parsedModes) {
-            cliCommands += `aux ${linkId} ${m.modeId} ${m.channelIndex} ${m.minRange} ${m.maxRange} 0\n`;
+            let mId = m.modeId;
+
+            // Map the string name back to the FC's specific mode ID
+            if (m.modeName) {
+                const matchedId = droneState.dynamicModeMap[m.modeName];
+                if (matchedId !== undefined) mId = matchedId;
+            }
+
+            cliCommands += `aux ${linkId} ${mId} ${m.channelIndex} ${m.minRange} ${m.maxRange} 0\n`;
             linkId++;
         }
     }
 
     // Explicitly clear any legacy/dangling mode links that might have been deleted
-    const oldModes = window.CliParser ? window.CliParser.parseModes(droneState.cliDiff) : [];
+    const oldModes = window.CliParser ? window.CliParser.parseModes(droneState.cliDiff, droneState.dynamicModeMap) : [];
     let maxOldLink = -1;
     if (oldModes && oldModes.length > 0) {
         maxOldLink = Math.max(...oldModes.map(m => m.linkId));
@@ -2249,9 +2316,9 @@ async function batchFlashModes() {
     }
 
     // --- Launch Control Fix ---
-    // Betaflight will silently reject and delete 'aux' mappings for mode 68 (Launch Control) 
+    // Betaflight will silently reject and delete 'aux' mappings for Launch Control
     // on reboot if the feature itself is currently disabled (launch_control_mode = NORMAL).
-    const isLaunchControlModeMapped = window.parsedModes.some(m => m.modeId === 68);
+    const isLaunchControlModeMapped = window.parsedModes.some(m => m.modeName === 'LAUNCH CONTROL');
     const lcfg = window.CliParser ? window.CliParser.parseLaunchControl(droneState.cliDiff) : null;
 
     if (isLaunchControlModeMapped && lcfg && lcfg.mode === 'NORMAL') {
@@ -2295,7 +2362,7 @@ function renderModesTab() {
 
     // When we have unsaved draft changes, use current parsedModes; otherwise re-parse from CLI
     if (!hasUnsavedChanges) {
-        window.parsedModes = window.CliParser.parseModes(droneState.cliDiff);
+        window.parsedModes = window.CliParser.parseModes(droneState.cliDiff, droneState.dynamicModeMap);
     }
 
     if (!window.parsedModes || window.parsedModes.length === 0) {
@@ -2514,8 +2581,15 @@ function renderModesTab() {
                 }
 
                 addModeDropdown.classList.add('hidden');
-                const mId = parseInt(item.getAttribute('data-mode-id'));
                 const mName = item.getAttribute('data-mode-name');
+                const fallbackId = parseInt(item.getAttribute('data-mode-id'), 10);
+
+                // Lookup the true mode ID via string name dynamically from the FC
+                let mId = fallbackId;
+                if (mName && droneState.dynamicModeMap) {
+                    const matchedId = droneState.dynamicModeMap[mName];
+                    if (matchedId !== undefined) mId = matchedId;
+                }
 
                 // Check if already exists in active bounds
                 const existingActiveMode = window.parsedModes.find(m =>
@@ -2670,12 +2744,20 @@ function renderModesTab() {
 }
 
 // Write the compiled mode link to the drone
-async function updateModeLinkCli(linkId, modeId, auxIndex, minBound, maxBound) {
+async function updateModeLinkCli(linkId, modeId, auxIndex, minBound, maxBound, modeName) {
+    let mId = modeId;
+
+    // Map the string name back to the FC's specific mode ID for isolated changes
+    if (modeName && droneState.dynamicModeMap) {
+        const matchedId = droneState.dynamicModeMap[modeName];
+        if (matchedId !== undefined) mId = matchedId;
+    }
+
     // Mode format: aux <linkId> <modeId> <auxChannel> <min> <max> <reserved>
-    let cmds = `aux ${linkId} ${modeId} ${auxIndex} ${minBound} ${maxBound} 0\n`;
+    let cmds = `aux ${linkId} ${mId} ${auxIndex} ${minBound} ${maxBound} 0\n`;
 
     // --- Launch Control Fix ---
-    if (modeId === 68) {
+    if (modeName === 'LAUNCH CONTROL') {
         const lcfg = window.CliParser ? window.CliParser.parseLaunchControl(droneState.cliDiff) : null;
         if (lcfg && lcfg.mode === 'NORMAL') {
             cmds += "set launch_control_mode = PITCHONLY\n";
@@ -2760,7 +2842,7 @@ async function startAutoDetect(modeId, btnElement) {
                     hasUnsavedChanges = true;
                     renderModesTab();
                     updateUnsavedModesUI();
-                    await updateModeLinkCli(targetMode.linkId, modeId, i, newMin, newMax);
+                    await updateModeLinkCli(targetMode.linkId, modeId, i, newMin, newMax, targetMode.modeName);
                 }
 
                 setTimeout(() => {
@@ -3530,22 +3612,7 @@ function renderBlackboxTab() {
     if (deviceEl) deviceEl.textContent = bbcfg ? bbcfg.device : '—';
     if (rateEl) rateEl.textContent = bbcfg ? `${bbcfg.sampleRate} / ${bbcfg.debugMode}` : '—';
 
-    // Intent Card Click Handlers
-    document.querySelectorAll('.intent-card').forEach(card => {
-        card.replaceWith(card.cloneNode(true));
-    });
-    document.querySelectorAll('.intent-card').forEach(card => {
-        card.addEventListener('click', () => {
-            document.querySelectorAll('.intent-card').forEach(c => c.classList.remove('selected'));
-            card.classList.add('selected');
-            const intent = card.dataset.intent;
-            let message = '';
-            if (intent === 'general') message = 'I want to set my Blackbox to General Flight & PID logging mode. Please give me the CLI commands.';
-            else if (intent === 'filters') message = 'I want to set my Blackbox to Filter & Noise Diagnostics mode (GYRO_SCALED, max sample rate). Please give me the CLI commands.';
-            else if (intent === 'disable') message = 'I want to disable Blackbox logging entirely to save storage. Please give me the CLI commands.';
-            if (message) sendMessageToCopilot(message);
-        });
-    });
+    // Intent Cards were removed in the UX redesign (Step 1-2-3 flow).
 
     if (bbcfg) {
         const mscBtn = document.getElementById('btnMountMsc');

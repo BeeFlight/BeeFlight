@@ -13,6 +13,8 @@ const MSP = {
     MSP_ANALOG: 110,
     MSP_STATUS: 101,
     MSP_PID: 112,
+    MSP_BOXNAMES: 116,
+    MSP_BOXIDS: 119,
     MSP_MOTOR_TELEMETRY: 139,
 
     // ---- Preamble bytes ----
@@ -149,5 +151,18 @@ const MSP = {
         // Pad to 4 motors minimum
         while (rpms.length < 4) rpms.push(0);
         return { rpms };
+    },
+
+    parseBoxNames(payload) {
+        // MSP_BOXNAMES (116): string of semicolon-separated names
+        const chars = Array.from(payload).map(b => String.fromCharCode(b));
+        const fullString = chars.join('');
+        // split by ';' and aggressively trim trailing spaces from C-array dumping
+        return fullString.split(';').map(n => n.trim()).filter(name => name.length > 0);
+    },
+
+    parseBoxIds(payload) {
+        // MSP_BOXIDS (119): array of u8 integers representing the Box IDs
+        return Array.from(payload);
     }
 };

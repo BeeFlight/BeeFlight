@@ -284,8 +284,22 @@
                                         <div class="data-card">
                                             <div class="card-header">Rates &amp; Stick Feel</div>
                                             <div class="card-body">
-                                                <canvas id="ratesChart"
-                                                    style="width:100%; height:200px; display:block; border-radius:8px;"></canvas>
+                                                <div class="rates-visualizer-row">
+                                                    <div class="rates-2d-col">
+                                                        <canvas id="ratesChart"
+                                                            style="width:100%; height:200px; display:block; border-radius:8px;"></canvas>
+                                                    </div>
+                                                    <div class="rates-3d-col">
+                                                        <div id="rates3dContainer" class="scene-container">
+                                                            <div id="rates3dOverlay" class="scene-overlay">
+                                                                🔌 Plug your radio into your computer via USB to test
+                                                                your rates live!
+                                                            </div>
+                                                            <button id="btnReset3D" class="btn-secondary btn-reset-3d">↻
+                                                                Reset</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                                 <div class="pid-rates-table">
                                                     <div class="pid-rates-header">
                                                         <span>Axis</span>
@@ -524,87 +538,127 @@
 
                         <!-- BLACKBOX TAB -->
                         <div id="view-blackbox" class="tab-view dashboard-cards">
-                            <h2 class="tab-title">Blackbox Insights & Intent</h2>
-
-                            <!-- Intents Row -->
-                            <div class="blackbox-intents">
-                                <div class="intent-card" data-intent="general">
-                                    <div class="intent-icon">🎯</div>
-                                    <h3>General Flight & PIDs</h3>
-                                    <p>Standard tracking (debug_mode = NONE)</p>
-                                </div>
-                                <div class="intent-card" data-intent="filters">
-                                    <div class="intent-icon">🚁</div>
-                                    <h3>Filter & Noise Diagnostics</h3>
-                                    <p>Sets GYRO_SCALED & max sample rate</p>
-                                </div>
-                                <div class="intent-card" data-intent="disable">
-                                    <div class="intent-icon">🛑</div>
-                                    <h3>Disable Logging</h3>
-                                    <p>Saves storage space</p>
-                                </div>
+                            <div class="bb-header" style="margin-bottom: 24px;">
+                                <h2 class="tab-title" style="margin-bottom: 8px;">Blackbox Insights & Intent</h2>
+                                <p class="tab-subtitle" style="color: var(--text-secondary); font-size: 1rem;">Diagnose
+                                    flight performance, filter tuning, and hardware health using your drone's recorded
+                                    Blackbox data.</p>
                             </div>
 
-                            <!-- Storage Control Row -->
-                            <div class="data-card blackbox-storage">
-                                <div class="card-header">Flash Storage Device</div>
+                            <!-- Step 1: Retrieve Logs -->
+                            <div class="bb-workflow-card data-card blackbox-storage" style="margin-bottom: 24px;">
+                                <div class="card-header"
+                                    style="display: flex; align-items: center; gap: 12px; font-size: 1.2rem;">
+                                    <div class="step-badge"
+                                        style="background: var(--accent-purple); color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; font-weight: bold;">
+                                        1</div>
+                                    Retrieve Flight Logs
+                                </div>
                                 <div class="card-body">
-                                    <div class="storage-info">
-                                        <div class="data-row"><span class="data-label">Selected Device:</span><span
-                                                class="data-value" id="valBboxDevice">Scanning...</span></div>
-                                        <div class="data-row"><span class="data-label">Rate / Debug:</span><span
-                                                class="data-value" id="valBboxRate">Scanning...</span></div>
-                                    </div>
-                                    <div class="storage-actions">
-                                        <button id="btnMountMsc" class="btn-primary btn-large"
-                                            style="background: var(--accent-purple); border-color: var(--accent-purple);">
-                                            1. Reboot Drone as USB Drive
-                                        </button>
-                                        <div class="vtx-subtext" style="text-align: center; margin-bottom: 15px;">
-                                            Fastest way to retrieve logs.<br><br>
-                                            <span style="color: var(--status-warning); font-weight: 500;">
-                                                ⚠️ Note: While mounted as a USB Flash Drive, the drone cannot talk via
-                                                MSP.<br>
-                                                It will accurately reconnect when you eject the drive or reboot it.
-                                            </span>
+                                    <div class="bb-retrieval-grid"
+                                        style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: center;">
+                                        <div class="storage-info">
+                                            <div class="data-row"><span class="data-label">Selected Device:</span><span
+                                                    class="data-value" id="valBboxDevice">Scanning...</span></div>
+                                            <div class="data-row"><span class="data-label">Rate / Debug:</span><span
+                                                    class="data-value" id="valBboxRate">Scanning...</span></div>
                                         </div>
-                                        <button id="btnScanLogs" class="btn-primary" style="margin-bottom: 15px;">
-                                            2. Scan Drone for Logs
-                                        </button>
-                                        <button id="btnEraseFlash" class="btn-danger">Erase Flash</button>
+                                        <div class="storage-actions"
+                                            style="display: flex; flex-direction: column; gap: 10px;">
+                                            <button id="btnMountMsc" class="btn-primary btn-large"
+                                                style="background: var(--accent-purple); border-color: var(--accent-purple); padding: 12px; border-radius: 8px;">
+                                                💻 Reboot Drone as USB Drive
+                                            </button>
+                                            <div class="vtx-subtext"
+                                                style="text-align: center; color: var(--text-secondary); font-size: 0.9rem;">
+                                                Fastest way to retrieve huge logs.
+                                            </div>
+                                            <button id="btnScanLogs" class="btn-primary"
+                                                style="padding: 10px; border-radius: 8px;">
+                                                📂 Scan Drone for Logs
+                                            </button>
+                                            <button id="btnEraseFlash" class="btn-danger"
+                                                style="margin-top: 5px; border-radius: 8px;">🗑️ Erase Flash</button>
+                                        </div>
+                                    </div>
+                                    <div class="bb-warning-banner"
+                                        style="margin-top: 20px; padding: 12px 16px; background: rgba(255, 171, 0, 0.1); border-left: 4px solid var(--status-warning); border-radius: 4px; display: flex; gap: 12px; align-items: flex-start;">
+                                        <span class="bb-warning-icon" style="font-size: 1.2rem;">⚠️</span>
+                                        <div class="bb-warning-text"
+                                            style="color: var(--text-primary); font-size: 0.95rem; line-height: 1.4;">
+                                            <strong>Note:</strong> While mounted as a USB Flash Drive, the drone cannot
+                                            talk via MSP. It will accurately reconnect to the AI when you eject the
+                                            drive or reboot it.
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Blackbox Log Analyzer -->
-                            <div class="blackbox-analyzer">
-                                <div id="blackboxLogList" class="blackbox-log-list hidden">
-                                    <h3>Found Logs</h3>
-                                    <ul id="bflList" class="bfl-list"></ul>
+                            <!-- Step 2: Analyze Data -->
+                            <div class="bb-workflow-card blackbox-analyzer"
+                                style="margin-bottom: 24px; padding: 20px; background: var(--surface-light); border-radius: 8px; border: 1px solid var(--border-color);">
+                                <div class="card-header"
+                                    style="display: flex; align-items: center; gap: 12px; font-size: 1.2rem; margin-bottom: 15px;">
+                                    <div class="step-badge"
+                                        style="background: var(--accent-purple); color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; font-weight: bold;">
+                                        2</div>
+                                    Analyze Data
                                 </div>
-                                <div class="blackbox-dropzone" id="blackboxDropzone" style="margin-top: 15px;">
-                                    <input type="file" id="blackboxFileInput" accept=".bbl,.csv,.txt" class="hidden">
-                                    <p class="dropzone-text">Or select a local <strong>.bbl</strong>, .csv, or .txt file
-                                    </p>
+                                <div class="card-body">
+                                    <div id="blackboxLogList" class="blackbox-log-list hidden">
+                                        <h3 style="margin-bottom: 10px;">Found Logs</h3>
+                                        <ul id="bflList" class="bfl-list"></ul>
+                                    </div>
+                                    <div class="blackbox-dropzone" id="blackboxDropzone"
+                                        style="margin-top: 15px; border: 2px dashed var(--border-color); border-radius: 12px; padding: 40px 20px; text-align: center; cursor: pointer; transition: all 0.2s ease; background: rgba(0,0,0,0.2);">
+                                        <input type="file" id="blackboxFileInput" accept=".bbl,.csv,.txt"
+                                            class="hidden">
+                                        <div class="dropzone-content">
+                                            <span
+                                                style="font-size: 2.5rem; margin-bottom: 15px; display: block; filter: saturate(0) brightness(1.5);">📥</span>
+                                            <p class="dropzone-text"
+                                                style="color: var(--text-primary); font-size: 1.1rem; margin: 0;">Drag
+                                                and drop your flight log here<br><span
+                                                    style="color: var(--text-secondary); font-size: 0.95rem; margin-top: 8px; display: block;">Or
+                                                    select a local <strong>.bbl</strong>, .csv, or .txt file</span></p>
+                                        </div>
+                                    </div>
+                                    <div id="blackboxProgress" class="blackbox-progress hidden"
+                                        style="margin-top: 20px;">
+                                        <div class="progress-steps"
+                                            style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 0.85rem; color: var(--text-secondary);">
+                                            <span id="bbStep1" class="progress-step">1. Decoding Binary...</span>
+                                            <span id="bbStep2" class="progress-step">2. Running Analysis...</span>
+                                            <span id="bbStep3" class="progress-step">3. Asking Copilot...</span>
+                                        </div>
+                                        <div class="progress-bar-track"
+                                            style="height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden;">
+                                            <div id="blackboxProgressBar" class="progress-bar-fill"
+                                                style="height: 100%; width: 0%; background: var(--accent-purple); transition: width 0.3s ease;">
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div id="blackboxProgress" class="blackbox-progress hidden">
-                                    <div class="progress-steps">
-                                        <span id="bbStep1" class="progress-step">1. Decoding Binary Data...</span>
-                                        <span id="bbStep2" class="progress-step">2. Running Analysis...</span>
-                                        <span id="bbStep3" class="progress-step">3. Asking Copilot...</span>
-                                    </div>
-                                    <div class="progress-bar-track">
-                                        <div id="blackboxProgressBar" class="progress-bar-fill"></div>
-                                    </div>
-                                </div>
-                                <div id="blackboxReportDashboard" class="report-dashboard hidden">
-                                    <div class="report-dashboard-header">
-                                        <h3>🛩️ Flight Report</h3>
-                                        <button id="btnCloseReport" class="btn-secondary">✕ Close Report</button>
-                                    </div>
+                            </div>
 
+                            <!-- Step 3: AI Insights -->
+                            <div class="bb-workflow-card report-dashboard hidden" id="blackboxReportDashboard"
+                                style="padding: 20px; background: var(--surface-light); border-radius: 8px; border: 1px solid var(--border-color);">
+                                <div class="card-header"
+                                    style="display: flex; align-items: center; gap: 12px; font-size: 1.2rem; margin-bottom: 15px;">
+                                    <div class="step-badge"
+                                        style="background: var(--accent-purple); color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; font-weight: bold;">
+                                        3</div>
+                                    AI Flight Report
+                                    <button id="btnCloseReport" class="btn-secondary"
+                                        style="margin-left: auto; padding: 4px 12px; font-size: 0.85rem;">✕ Close
+                                        Report</button>
+                                </div>
+                                <div class="card-body">
                                     <!-- Flight Summary -->
-                                    <div id="reportFlightSummary" class="report-summary-text"></div>
+                                    <div id="reportFlightSummary" class="report-summary-text"
+                                        style="font-size: 1.1rem; line-height: 1.5; color: var(--text-primary); margin-bottom: 24px; padding: 15px; background: rgba(0,0,0,0.2); border-left: 4px solid var(--accent-purple); border-radius: 4px;">
+                                    </div>
 
                                     <!-- 4-Card Grid -->
                                     <div class="report-grid">
@@ -620,353 +674,354 @@
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="report-card" id="cardVibration">
-                                            <div class="report-card-icon" id="vibeIcon">📳</div>
-                                            <div class="report-card-title">Vibration & Noise</div>
-                                            <div class="report-card-body">
-                                                <div id="vibeStatus" class="vibe-indicator"></div>
-                                                <div class="noise-axes">
-                                                    <span>Roll: <b id="noiseRoll">—</b></span>
-                                                    <span>Pitch: <b id="noisePitch">—</b></span>
-                                                    <span>Yaw: <b id="noiseYaw">—</b></span>
-                                                </div>
+                                    </div>
+                                    <div class="report-card" id="cardVibration">
+                                        <div class="report-card-icon" id="vibeIcon">📳</div>
+                                        <div class="report-card-title">Vibration & Noise</div>
+                                        <div class="report-card-body">
+                                            <div id="vibeStatus" class="vibe-indicator"></div>
+                                            <div class="noise-axes">
+                                                <span>Roll: <b id="noiseRoll">—</b></span>
+                                                <span>Pitch: <b id="noisePitch">—</b></span>
+                                                <span>Yaw: <b id="noiseYaw">—</b></span>
                                             </div>
                                         </div>
-                                        <div class="report-card" id="cardMotorHealth">
-                                            <div class="report-card-icon">🚁</div>
-                                            <div class="report-card-title">Motor Health</div>
-                                            <div class="report-card-body">
-                                                <div id="motorHealthText" class="motor-health-text"></div>
-                                                <div class="motor-bar-chart">
-                                                    <div class="motor-bar-wrapper">
-                                                        <div class="motor-bar" id="motorBar1"></div><span>M1</span>
-                                                    </div>
-                                                    <div class="motor-bar-wrapper">
-                                                        <div class="motor-bar" id="motorBar2"></div><span>M2</span>
-                                                    </div>
-                                                    <div class="motor-bar-wrapper">
-                                                        <div class="motor-bar" id="motorBar3"></div><span>M3</span>
-                                                    </div>
-                                                    <div class="motor-bar-wrapper">
-                                                        <div class="motor-bar" id="motorBar4"></div><span>M4</span>
-                                                    </div>
+                                    </div>
+                                    <div class="report-card" id="cardMotorHealth">
+                                        <div class="report-card-icon">🚁</div>
+                                        <div class="report-card-title">Motor Health</div>
+                                        <div class="report-card-body">
+                                            <div id="motorHealthText" class="motor-health-text"></div>
+                                            <div class="motor-bar-chart">
+                                                <div class="motor-bar-wrapper">
+                                                    <div class="motor-bar" id="motorBar1"></div><span>M1</span>
                                                 </div>
-                                            </div>
-                                        </div>
-                                        <div class="report-card" id="cardPID">
-                                            <div class="report-card-icon">📈</div>
-                                            <div class="report-card-title">PID Tracking</div>
-                                            <div class="report-card-body">
-                                                <div id="pidPerformanceText"></div>
-                                                <div class="tracking-axes">
-                                                    <span>Roll Error: <b id="trackRoll">—</b></span>
-                                                    <span>Pitch Error: <b id="trackPitch">—</b></span>
+                                                <div class="motor-bar-wrapper">
+                                                    <div class="motor-bar" id="motorBar2"></div><span>M2</span>
+                                                </div>
+                                                <div class="motor-bar-wrapper">
+                                                    <div class="motor-bar" id="motorBar3"></div><span>M3</span>
+                                                </div>
+                                                <div class="motor-bar-wrapper">
+                                                    <div class="motor-bar" id="motorBar4"></div><span>M4</span>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
-
-                                    <!-- Recommended Fixes -->
-                                    <div id="reportRecommendedFixes" class="report-fixes-section hidden">
-                                        <h4>🔧 Recommended Fixes</h4>
-                                        <div id="reportActionCards"></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div id="view-motors" class="tab-view dashboard-cards">
-                            <h2 class="tab-title">Motors & Mixing</h2>
-
-                            <!-- Config Summary Row -->
-                            <div class="motor-config-row">
-                                <div class="data-card">
-                                    <div class="card-header">ESC Protocol</div>
-                                    <div class="card-body"><span class="data-value motor-config-val"
-                                            id="valEscProtocol">—</span></div>
-                                </div>
-                                <div class="data-card">
-                                    <div class="card-header">Bidirectional DSHOT</div>
-                                    <div class="card-body"><span class="data-value motor-config-val"
-                                            id="valBidir">—</span></div>
-                                </div>
-                                <div class="data-card">
-                                    <div class="card-header">Motor Poles</div>
-                                    <div class="card-body"><span class="data-value motor-config-val"
-                                            id="valMotorPoles">—</span></div>
-                                </div>
-                            </div>
-
-                            <!-- 3D Visualizer -->
-                            <div class="motor-3d-wrapper">
-                                <div id="motor3DCanvas" class="canvas-container"
-                                    style="height: 400px; position: relative;"></div>
-                                <div class="canvas-overlay">
-                                    <span class="overlay-label">🔄 CW / CCW Rotation · Props In / Props Out</span>
-                                </div>
-                            </div>
-
-                            <!-- Live RPM Telemetry -->
-                            <div class="rpm-grid">
-                                <div class="rpm-block">
-                                    <div class="rpm-label">Motor 1 (FR)</div>
-                                    <div class="rpm-value" id="rpmMotor1">0</div>
-                                    <div class="rpm-unit">RPM</div>
-                                </div>
-                                <div class="rpm-block">
-                                    <div class="rpm-label">Motor 2 (FL)</div>
-                                    <div class="rpm-value" id="rpmMotor2">0</div>
-                                    <div class="rpm-unit">RPM</div>
-                                </div>
-                                <div class="rpm-block">
-                                    <div class="rpm-label">Motor 3 (BR)</div>
-                                    <div class="rpm-value" id="rpmMotor3">0</div>
-                                    <div class="rpm-unit">RPM</div>
-                                </div>
-                                <div class="rpm-block">
-                                    <div class="rpm-label">Motor 4 (BL)</div>
-                                    <div class="rpm-value" id="rpmMotor4">0</div>
-                                    <div class="rpm-unit">RPM</div>
-                                </div>
-                            </div>
-
-                            <!-- Safety Disclaimer -->
-                            <p class="motor-safety-disclaimer">⚠️ Manual motor testing via browser is disabled for
-                                safety. Use your radio to test live RPM.</p>
-                        </div>
-                        <div id="view-osd" class="tab-view">
-                            <!-- System Select Overlay -->
-                            <div id="osdSystemSelect" class="osd-system-select">
-                                <h2 class="tab-title">Select Your Video System</h2>
-                                <div class="osd-system-cards">
-                                    <div class="osd-sys-card" data-system="analog">
-                                        <div class="osd-sys-icon">📡</div>
-                                        <h3>Analog Video</h3>
-                                        <p>TBS Unify, Foxeer, Standard 5.8GHz</p>
-                                        <span class="osd-sys-grid">30 × 16 Grid</span>
-                                    </div>
-                                    <div class="osd-sys-card" data-system="hd">
-                                        <div class="osd-sys-icon">🎬</div>
-                                        <h3>HD Digital</h3>
-                                        <p>DJI O3, Walksnail Avatar, HDZero</p>
-                                        <span class="osd-sys-grid">50 × 18 Grid</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Main OSD Editor (hidden until system selected) -->
-                            <div id="osdEditor" class="osd-editor hidden">
-                                <!-- Template Buttons -->
-                                <div class="osd-templates">
-                                    <button class="osd-template-btn" data-template="freestyle">🎯 Freestyle</button>
-                                    <button class="osd-template-btn" data-template="racing">🏁 Racing</button>
-                                    <button class="osd-template-btn" data-template="longrange">🛰️ Long Range /
-                                        GPS</button>
-                                </div>
-
-                                <!-- Main OSD Editor Layout -->
-                                <div class="osd-editor-layout">
-                                    <div id="osdElementsBank" class="osd-elements-bank">
-                                        <!-- Inactive elements go here -->
-                                        <div class="osd-drawer-placeholder">Available Elements</div>
-                                    </div>
-                                    <!-- OSD Canvas -->
-                                    <div id="osdCanvas" class="osd-canvas">
-                                        <!-- OSD elements rendered here by osdEditor.js -->
-                                    </div>
-                                </div>
-
-                                <!-- Pending Changes Bar -->
-                                <div id="osdPendingBar" class="osd-pending-bar hidden">
-                                    <span id="osdPendingCount">0 pending changes</span>
-                                    <button id="osdReviewBtn" class="btn-primary">Review & Save Changes</button>
-                                </div>
-                            </div>
-                        </div>
-                        <div id="view-vtx" class="tab-view">
-                            <h2 class="tab-title">Video Transmitter</h2>
-                            <div class="vtx-layout">
-                                <!-- Top: System Type / Protocol Badge -->
-                                <div class="data-card card-wide vtx-protocol-card">
-                                    <div class="card-header">Video System</div>
-                                    <div class="card-body">
-                                        <div id="vtxProtocolBadge" class="vtx-protocol-badge">
-                                            📡 VTX Protocol: Detecting...
-                                        </div>
-                                        <p id="vtxProtocolDescription" class="vtx-protocol-description">
-                                            Waiting for CLI sync to detect your video system.
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <!-- Middle: Current Settings -->
-                                <div class="vtx-grid">
-                                    <div class="data-card vtx-card">
-                                        <div class="card-header">Band</div>
-                                        <div class="card-body">
-                                            <div id="vtxBandValue" class="vtx-value">—</div>
-                                            <div class="vtx-subtext">Value from Betaflight CLI</div>
-                                            <div id="vtxBandHdNote" class="vtx-hd-note hidden">
-                                                Band and Channel are managed directly through your HD Goggles, not
-                                                Betaflight.
+                                    <div class="report-card" id="cardPID">
+                                        <div class="report-card-icon">📈</div>
+                                        <div class="report-card-title">PID Tracking</div>
+                                        <div class="report-card-body">
+                                            <div id="pidPerformanceText"></div>
+                                            <div class="tracking-axes">
+                                                <span>Roll Error: <b id="trackRoll">—</b></span>
+                                                <span>Pitch Error: <b id="trackPitch">—</b></span>
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="data-card vtx-card">
-                                        <div class="card-header">Channel</div>
-                                        <div class="card-body">
-                                            <div id="vtxChannelValue" class="vtx-value">—</div>
-                                            <div class="vtx-subtext">Value from Betaflight CLI</div>
-                                            <div id="vtxChannelHdNote" class="vtx-hd-note hidden">
-                                                Band and Channel are managed directly through your HD Goggles, not
-                                                Betaflight.
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="data-card vtx-card">
-                                        <div class="card-header">Power Level</div>
-                                        <div class="card-body">
-                                            <div id="vtxPowerValue" class="vtx-value">—</div>
-                                            <div class="vtx-subtext">Value from Betaflight CLI</div>
-                                        </div>
-                                    </div>
                                 </div>
 
-                                <!-- Bottom: AI Helper Prompt -->
-                                <div class="data-card card-wide ai-hook-card vtx-ai-helper">
-                                    <div class="card-header">Race-Ready Channel Helper</div>
-                                    <div class="card-body">
-                                        <p>
-                                            Need to change your channel at a race? Tell the Copilot:
-                                        </p>
-                                        <blockquote class="vtx-quote">
-                                            "Put me on Raceband 8 at 25mW".
-                                        </blockquote>
-                                    </div>
+                                <!-- Recommended Fixes -->
+                                <div id="reportRecommendedFixes" class="report-fixes-section hidden">
+                                    <h4>🔧 Recommended Fixes</h4>
+                                    <div id="reportActionCards"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="view-motors" class="tab-view dashboard-cards">
+                        <h2 class="tab-title">Motors & Mixing</h2>
+
+                        <!-- Config Summary Row -->
+                        <div class="motor-config-row">
+                            <div class="data-card">
+                                <div class="card-header">ESC Protocol</div>
+                                <div class="card-body"><span class="data-value motor-config-val"
+                                        id="valEscProtocol">—</span></div>
+                            </div>
+                            <div class="data-card">
+                                <div class="card-header">Bidirectional DSHOT</div>
+                                <div class="card-body"><span class="data-value motor-config-val" id="valBidir">—</span>
+                                </div>
+                            </div>
+                            <div class="data-card">
+                                <div class="card-header">Motor Poles</div>
+                                <div class="card-body"><span class="data-value motor-config-val"
+                                        id="valMotorPoles">—</span></div>
+                            </div>
+                        </div>
+
+                        <!-- 3D Visualizer -->
+                        <div class="motor-3d-wrapper">
+                            <div id="motor3DCanvas" class="canvas-container" style="height: 400px; position: relative;">
+                            </div>
+                            <div class="canvas-overlay">
+                                <span class="overlay-label">🔄 CW / CCW Rotation · Props In / Props Out</span>
+                            </div>
+                        </div>
+
+                        <!-- Live RPM Telemetry -->
+                        <div class="rpm-grid">
+                            <div class="rpm-block">
+                                <div class="rpm-label">Motor 1 (FR)</div>
+                                <div class="rpm-value" id="rpmMotor1">0</div>
+                                <div class="rpm-unit">RPM</div>
+                            </div>
+                            <div class="rpm-block">
+                                <div class="rpm-label">Motor 2 (FL)</div>
+                                <div class="rpm-value" id="rpmMotor2">0</div>
+                                <div class="rpm-unit">RPM</div>
+                            </div>
+                            <div class="rpm-block">
+                                <div class="rpm-label">Motor 3 (BR)</div>
+                                <div class="rpm-value" id="rpmMotor3">0</div>
+                                <div class="rpm-unit">RPM</div>
+                            </div>
+                            <div class="rpm-block">
+                                <div class="rpm-label">Motor 4 (BL)</div>
+                                <div class="rpm-value" id="rpmMotor4">0</div>
+                                <div class="rpm-unit">RPM</div>
+                            </div>
+                        </div>
+
+                        <!-- Safety Disclaimer -->
+                        <p class="motor-safety-disclaimer">⚠️ Manual motor testing via browser is disabled for
+                            safety. Use your radio to test live RPM.</p>
+                    </div>
+                    <div id="view-osd" class="tab-view">
+                        <!-- System Select Overlay -->
+                        <div id="osdSystemSelect" class="osd-system-select">
+                            <h2 class="tab-title">Select Your Video System</h2>
+                            <div class="osd-system-cards">
+                                <div class="osd-sys-card" data-system="analog">
+                                    <div class="osd-sys-icon">📡</div>
+                                    <h3>Analog Video</h3>
+                                    <p>TBS Unify, Foxeer, Standard 5.8GHz</p>
+                                    <span class="osd-sys-grid">30 × 16 Grid</span>
+                                </div>
+                                <div class="osd-sys-card" data-system="hd">
+                                    <div class="osd-sys-icon">🎬</div>
+                                    <h3>HD Digital</h3>
+                                    <p>DJI O3, Walksnail Avatar, HDZero</p>
+                                    <span class="osd-sys-grid">50 × 18 Grid</span>
                                 </div>
                             </div>
                         </div>
 
-                        <div id="tabBackup" class="tab-view">
-                            <h2 class="tab-title">Backup &amp; Export</h2>
+                        <!-- Main OSD Editor (hidden until system selected) -->
+                        <div id="osdEditor" class="osd-editor hidden">
+                            <!-- Template Buttons -->
+                            <div class="osd-templates">
+                                <button class="osd-template-btn" data-template="freestyle">🎯 Freestyle</button>
+                                <button class="osd-template-btn" data-template="racing">🏁 Racing</button>
+                                <button class="osd-template-btn" data-template="longrange">🛰️ Long Range /
+                                    GPS</button>
+                            </div>
 
-                            <div class="backup-layout">
-                                <!-- Export Card -->
-                                <div class="data-card">
-                                    <div class="card-header">Export Current Configuration</div>
+                            <!-- Main OSD Editor Layout -->
+                            <div class="osd-editor-layout">
+                                <div id="osdElementsBank" class="osd-elements-bank">
+                                    <!-- Inactive elements go here -->
+                                    <div class="osd-drawer-placeholder">Available Elements</div>
+                                </div>
+                                <!-- OSD Canvas -->
+                                <div id="osdCanvas" class="osd-canvas">
+                                    <!-- OSD elements rendered here by osdEditor.js -->
+                                </div>
+                            </div>
+
+                            <!-- Pending Changes Bar -->
+                            <div id="osdPendingBar" class="osd-pending-bar hidden">
+                                <span id="osdPendingCount">0 pending changes</span>
+                                <button id="osdReviewBtn" class="btn-primary">Review & Save Changes</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="view-vtx" class="tab-view">
+                        <h2 class="tab-title">Video Transmitter</h2>
+                        <div class="vtx-layout">
+                            <!-- Top: System Type / Protocol Badge -->
+                            <div class="data-card card-wide vtx-protocol-card">
+                                <div class="card-header">Video System</div>
+                                <div class="card-body">
+                                    <div id="vtxProtocolBadge" class="vtx-protocol-badge">
+                                        📡 VTX Protocol: Detecting...
+                                    </div>
+                                    <p id="vtxProtocolDescription" class="vtx-protocol-description">
+                                        Waiting for CLI sync to detect your video system.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <!-- Middle: Current Settings -->
+                            <div class="vtx-grid">
+                                <div class="data-card vtx-card">
+                                    <div class="card-header">Band</div>
                                     <div class="card-body">
+                                        <div id="vtxBandValue" class="vtx-value">—</div>
+                                        <div class="vtx-subtext">Value from Betaflight CLI</div>
+                                        <div id="vtxBandHdNote" class="vtx-hd-note hidden">
+                                            Band and Channel are managed directly through your HD Goggles, not
+                                            Betaflight.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="data-card vtx-card">
+                                    <div class="card-header">Channel</div>
+                                    <div class="card-body">
+                                        <div id="vtxChannelValue" class="vtx-value">—</div>
+                                        <div class="vtx-subtext">Value from Betaflight CLI</div>
+                                        <div id="vtxChannelHdNote" class="vtx-hd-note hidden">
+                                            Band and Channel are managed directly through your HD Goggles, not
+                                            Betaflight.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="data-card vtx-card">
+                                    <div class="card-header">Power Level</div>
+                                    <div class="card-body">
+                                        <div id="vtxPowerValue" class="vtx-value">—</div>
+                                        <div class="vtx-subtext">Value from Betaflight CLI</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Bottom: AI Helper Prompt -->
+                            <div class="data-card card-wide ai-hook-card vtx-ai-helper">
+                                <div class="card-header">Race-Ready Channel Helper</div>
+                                <div class="card-body">
+                                    <p>
+                                        Need to change your channel at a race? Tell the Copilot:
+                                    </p>
+                                    <blockquote class="vtx-quote">
+                                        "Put me on Raceband 8 at 25mW".
+                                    </blockquote>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="tabBackup" class="tab-view">
+                        <h2 class="tab-title">Backup &amp; Export</h2>
+
+                        <div class="backup-layout">
+                            <!-- Export Card -->
+                            <div class="data-card">
+                                <div class="card-header">Export Current Configuration</div>
+                                <div class="card-body">
+                                    <p class="backup-copy">
+                                        Export your current BeeFlight configuration diff so you can restore it
+                                        later or share it safely with others.
+                                    </p>
+
+                                    <div class="backup-export-row">
+                                        <button id="btnExportLocal" class="backup-export-btn">
+                                            <span class="backup-icon">💾</span>
+                                            <span class="backup-label">Download Local (.txt)</span>
+                                        </button>
+
+                                        <div class="backup-cloud-option">
+                                            <button id="btnExportDrive" class="backup-export-btn">
+                                                <span class="backup-icon">☁️</span>
+                                                <span class="backup-label">Save to Google Drive</span>
+                                            </button>
+                                            <span id="driveAuthStatus" class="auth-status-pill">Not connected</span>
+                                        </div>
+
+                                        <div class="backup-cloud-option">
+                                            <button id="btnExportGist" class="backup-export-btn">
+                                                <span class="backup-icon">🐙</span>
+                                                <span class="backup-label">Publish to GitHub (Gist)</span>
+                                            </button>
+                                            <span id="githubAuthStatus" class="auth-status-pill">Not
+                                                configured</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Restore Card -->
+                            <div class="data-card restore-card">
+                                <div class="card-header">Restore Configuration</div>
+                                <div class="card-body">
+                                    <!-- State 1: Upload -->
+                                    <div id="restoreStateUpload">
                                         <p class="backup-copy">
-                                            Export your current BeeFlight configuration diff so you can restore it
-                                            later or share it safely with others.
+                                            Select a previously saved backup file to restore your configuration.
+                                            BeeFlight AI will run a safety checklist before flashing anything.
                                         </p>
-
-                                        <div class="backup-export-row">
-                                            <button id="btnExportLocal" class="backup-export-btn">
-                                                <span class="backup-icon">💾</span>
-                                                <span class="backup-label">Download Local (.txt)</span>
-                                            </button>
-
-                                            <div class="backup-cloud-option">
-                                                <button id="btnExportDrive" class="backup-export-btn">
-                                                    <span class="backup-icon">☁️</span>
-                                                    <span class="backup-label">Save to Google Drive</span>
-                                                </button>
-                                                <span id="driveAuthStatus" class="auth-status-pill">Not connected</span>
-                                            </div>
-
-                                            <div class="backup-cloud-option">
-                                                <button id="btnExportGist" class="backup-export-btn">
-                                                    <span class="backup-icon">🐙</span>
-                                                    <span class="backup-label">Publish to GitHub (Gist)</span>
-                                                </button>
-                                                <span id="githubAuthStatus" class="auth-status-pill">Not
-                                                    configured</span>
-                                            </div>
-                                        </div>
+                                        <input type="file" id="importFileInput" accept=".txt,.bfai" class="hidden">
+                                        <button id="btnSelectImportFile" class="backup-export-btn">
+                                            <span class="backup-icon">📁</span>
+                                            <span class="backup-label">Select Backup File</span>
+                                        </button>
                                     </div>
-                                </div>
 
-                                <!-- Restore Card -->
-                                <div class="data-card restore-card">
-                                    <div class="card-header">Restore Configuration</div>
-                                    <div class="card-body">
-                                        <!-- State 1: Upload -->
-                                        <div id="restoreStateUpload">
-                                            <p class="backup-copy">
-                                                Select a previously saved backup file to restore your configuration.
-                                                BeeFlight AI will run a safety checklist before flashing anything.
-                                            </p>
-                                            <input type="file" id="importFileInput" accept=".txt,.bfai" class="hidden">
-                                            <button id="btnSelectImportFile" class="backup-export-btn">
-                                                <span class="backup-icon">📁</span>
-                                                <span class="backup-label">Select Backup File</span>
+                                    <!-- State 2: Analyzing -->
+                                    <div id="restoreStateAnalyzing" class="hidden restore-analyzing">
+                                        <div class="spinner"></div>
+                                        <p>AI is analyzing your backup file...</p>
+                                    </div>
+
+                                    <!-- State 3 & 4: Checklist + Gate -->
+                                    <div id="restoreStateChecklist" class="hidden">
+                                        <div id="preFlightChecklist" class="checklist">
+                                            <div class="check-item" data-key="hardwareMatch">
+                                                <span id="chkHardwareIcon" class="check-icon">⬜</span>
+                                                <span>Hardware Target Match</span>
+                                            </div>
+                                            <div class="check-item" data-key="versionMatch">
+                                                <span id="chkVersionIcon" class="check-icon">⬜</span>
+                                                <span>Firmware Version Compatibility</span>
+                                            </div>
+                                            <div class="check-item" data-key="fileIntegrity">
+                                                <span id="chkIntegrityIcon" class="check-icon">⬜</span>
+                                                <span>File Integrity (No missing data)</span>
+                                            </div>
+                                            <div class="check-item" data-key="motorSafety">
+                                                <span id="chkMotorIcon" class="check-icon">⬜</span>
+                                                <span>Motor Protocol Safety</span>
+                                            </div>
+                                        </div>
+
+                                        <div id="importErrorBox" class="import-error hidden"></div>
+
+                                        <div id="importProgressContainer" class="import-progress hidden">
+                                            <div class="import-progress-bar-outer">
+                                                <div id="importProgressBar" class="import-progress-bar-inner"></div>
+                                            </div>
+                                            <span id="importProgressLabel" class="import-progress-label">0%</span>
+                                        </div>
+
+                                        <div class="restore-actions">
+                                            <button id="btnFlashDrone" class="btn-danger" disabled>
+                                                Overwrite Current Settings
                                             </button>
-                                        </div>
-
-                                        <!-- State 2: Analyzing -->
-                                        <div id="restoreStateAnalyzing" class="hidden restore-analyzing">
-                                            <div class="spinner"></div>
-                                            <p>AI is analyzing your backup file...</p>
-                                        </div>
-
-                                        <!-- State 3 & 4: Checklist + Gate -->
-                                        <div id="restoreStateChecklist" class="hidden">
-                                            <div id="preFlightChecklist" class="checklist">
-                                                <div class="check-item" data-key="hardwareMatch">
-                                                    <span id="chkHardwareIcon" class="check-icon">⬜</span>
-                                                    <span>Hardware Target Match</span>
-                                                </div>
-                                                <div class="check-item" data-key="versionMatch">
-                                                    <span id="chkVersionIcon" class="check-icon">⬜</span>
-                                                    <span>Firmware Version Compatibility</span>
-                                                </div>
-                                                <div class="check-item" data-key="fileIntegrity">
-                                                    <span id="chkIntegrityIcon" class="check-icon">⬜</span>
-                                                    <span>File Integrity (No missing data)</span>
-                                                </div>
-                                                <div class="check-item" data-key="motorSafety">
-                                                    <span id="chkMotorIcon" class="check-icon">⬜</span>
-                                                    <span>Motor Protocol Safety</span>
-                                                </div>
-                                            </div>
-
-                                            <div id="importErrorBox" class="import-error hidden"></div>
-
-                                            <div id="importProgressContainer" class="import-progress hidden">
-                                                <div class="import-progress-bar-outer">
-                                                    <div id="importProgressBar" class="import-progress-bar-inner"></div>
-                                                </div>
-                                                <span id="importProgressLabel" class="import-progress-label">0%</span>
-                                            </div>
-
-                                            <div class="restore-actions">
-                                                <button id="btnFlashDrone" class="btn-danger" disabled>
-                                                    Overwrite Current Settings
-                                                </button>
-                                                <button id="btnCancelImport" class="btn-secondary">
-                                                    Cancel
-                                                </button>
-                                            </div>
+                                            <button id="btnCancelImport" class="btn-secondary">
+                                                Cancel
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
+                    </div>
 
-                        <!-- Legacy hooks for agents/QA expecting legacy tab containers -->
-                        <div id="tabVTX" class="tab-pane hidden"></div>
-                        <div id="tabPID" class="tab-pane hidden"></div>
+                    <!-- Legacy hooks for agents/QA expecting legacy tab containers -->
+                    <div id="tabVTX" class="tab-pane hidden"></div>
+                    <div id="tabPID" class="tab-pane hidden"></div>
 
-                    </div> <!-- End Dashboard Views -->
-                </div> <!-- End Dashboard Layout -->
+                </div> <!-- End Dashboard Views -->
+            </div> <!-- End Dashboard Layout -->
 
-                <!-- Sync Overlay -->
-                <div id="syncOverlay" class="sync-overlay hidden">
-                    <div class="sync-spinner"></div>
-                    <p>Syncing AI Context...</p>
-                </div>
+            <!-- Sync Overlay -->
+            <div id="syncOverlay" class="sync-overlay hidden">
+                <div class="sync-spinner"></div>
+                <p>Syncing AI Context...</p>
+            </div>
 
-                <!-- Hidden E-Stop for future QA requirements -->
-                <button id="emergencyStopBtn" class="btn-danger hidden">EMERGENCY STOP</button>
+            <!-- Hidden E-Stop for future QA requirements -->
+            <button id="emergencyStopBtn" class="btn-danger hidden">EMERGENCY STOP</button>
         </main>
 
         <!-- Resizable Splitter -->
@@ -1164,6 +1219,8 @@
     <script src="drone3DBuilder.js"></script>
     <script src="osdEditor.js"></script>
     <script src="aiService.js"></script>
+    <script src="logAnalyzer.js"></script>
+    <script src="rates3D.js"></script>
     <script src="app.js"></script>
 </body>
 
