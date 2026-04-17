@@ -73,7 +73,7 @@ Ai/
 
 ## Security
 
-API keys and tokens are entered in the app and stored in **localStorage** only. They are sent directly to the chosen AI provider (e.g. Google, OpenAI); they are not sent to this repository’s servers.
+API keys and tokens are entered in the app and should only be stored in session only. They are sent directly to the chosen AI provider.
 
 ---
 
