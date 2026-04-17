@@ -9,7 +9,7 @@
 BeeFlight AI is a browser-based configurator that connects to your flight controller over USB (Web Serial), reads your CLI configuration, and uses an AI assistant to suggest and apply changes via structured Action Cards with Approve & Flash and Undo (Rollback).
 
 ---
-**Use at your own risk.** BeeFlight AI allows you to read and write flight-controller configuration. Incorrect or incompatible settings can damage ESCs, motors, or the flight controller, and can cause loss of control, crashes, or injury. Always verify changes (including AI-suggested commands) before flying. Backup your config before applying changes. The authors and contributors are not responsible for any damage or loss resulting from use of this software.
+**Use at your own risk.** BeeFlight AI allows you to read and write flight-controller configuration. Incorrect or incompatible settings can damage ESCs, motors, or the flight controller, and can cause loss of control, crashes, or injury. Always verify changes (including AI-suggested commands) before flying. Backup your config before applying changes. 
 
 ## Overview
 
